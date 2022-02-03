@@ -1,13 +1,10 @@
 import os
-from re import A
 import time
 import pickle
-import tika
 import multiprocessing as mp
 from multiprocessing import freeze_support
 from text_extractor import extractText
 import argparse
-from itertools import repeat
 
 
 def main():
