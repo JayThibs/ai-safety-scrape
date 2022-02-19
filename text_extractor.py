@@ -1,17 +1,8 @@
 import os
-from hashlib import new
 import re
 import pickle
-from tika import parser
 from bs4 import BeautifulSoup
 from nltk.tokenize import word_tokenize
-
-
-def tikaTextExtractor(file_path):
-    """Extracts text from a PDF using tika."""
-    print("Extracting text from file: " + file_path)
-    parsed_tika = parser.from_file(file_path)
-    return parsed_tika["content"]
 
 
 def splitText(text):
@@ -96,19 +87,6 @@ def extractText(file_path, overwrite=False):
         for i in range(len(text)):
             cleaned_text = cleanText(text[i])
             cleaned_text_tokens = len(word_tokenize(cleaned_text))
-            # if cleaned_text_tokens > max_spacy_token_length:
-            #     num_text_splits = biggest_multiple(
-            #         max_spacy_token_length, cleaned_text_tokens
-            #     )
-            #     for j in range(num_text_splits):
-            #         # TODO: This could be improved by splitting texts based on last period to make sure that sentences are not split in the middle.
-            #         # The only issue is to the sentences with words like Mr. or Mrs.
-            #         newSplit = cleaned_text[
-            #             j * max_spacy_token_length : (j + 1) * max_spacy_token_length
-            #         ]
-            #         newTextList.append(newSplit)
-            # newTextList.append(cleaned_text[(j + 1) * max_spacy_token_length :])
-
             if (
                 cleaned_text_tokens >= 5
                 and cleaned_text_tokens <= max_spacy_token_length
