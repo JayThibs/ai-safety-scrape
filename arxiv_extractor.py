@@ -16,7 +16,7 @@ def any_to_utf8(b):
     try:
         return b.decode("utf-8")
     except UnicodeDecodeError:
-        # try to figure out encoding if not urf-8
+        # try to figure out encoding if not utf-8
 
         guess = chardet.detect(b)["encoding"]
 
