@@ -7,6 +7,7 @@ import multiprocessing as mp
 import chardet
 import bs4
 import time
+from tqdm import tqdm
 
 
 sh("mkdir -p tmp tmp2 out done fallback_needed errored")
