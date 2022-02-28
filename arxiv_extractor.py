@@ -14,6 +14,7 @@ sh("mkdir -p tmp tmp2 out done fallback_needed errored")
 
 
 def any_to_utf8(b):
+    """Detects encoding and converts to utf-8."""
     try:
         return b.decode("utf-8")
     except UnicodeDecodeError:
@@ -99,6 +100,10 @@ def convert(tex):
 
 
 def preextract_tar(dump):
+    """
+    Creates tmp2/{dump_name} directory and extracts tar files and copies them to tmp2/dump_name/*.
+    Creates tmp2/done_{dump_name} file to signal copy_tar that extraction is done.
+    """
     dump_name = dump.split("/")[-1][:-4]
     sh(
         f"(mkdir -p tmp2/{dump_name}; tar xf {dump} -C tmp2/{dump_name} && touch tmp2/done_{dump_name}; echo finished preload of {dump_name}) &"
@@ -106,6 +111,7 @@ def preextract_tar(dump):
 
 
 def copy_tar(dump):
+    """Copies tar files from tmp2/{dump_name}/* to tmp/."""
     dump_name = dump.split("/")[-1][:-4]
     for i in range(120):
         if os.path.exists(f"tmp2/done_{dump_name}"):
