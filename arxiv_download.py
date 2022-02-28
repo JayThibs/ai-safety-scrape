@@ -4,18 +4,18 @@ import os
 from collections import OrderedDict
 from urllib.parse import urlparse
 
-import arxiv
+import arxiv_download_download
 from arxiv.utils import EntryWriter
 
 
 def cmd_list(args):
-    for name in arxiv.ALL_ARXIV_PAPERS:
+    for name in arxiv_download_download.ALL_ARXIV_PAPERS:
         print(name)
 
 
 def cmd_fetch(args):
     with EntryWriter(args.name, args.path) as writer:
-        for entry in arxiv.get_arxiv_paper(args.name).fetch_entries():
+        for entry in arxiv_download_download.get_arxiv_paper(args.name).fetch_entries():
             writer.write(entry)
 
 

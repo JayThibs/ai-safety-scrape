@@ -131,11 +131,14 @@ sh("rm -rf tmp/* tmp2/*")
 preextract_tar(files[0])
 
 for i, dump in enumerate(tqdm(files)):
+    # extracts tar files to tmp2/{dump_name}/*
     if i + 1 < len(files):
         preextract_tar(files[i + 1])
     try:
+        # clear tmp every loop to process only one set of .tex files at a time
         sh("rm -rf tmp/*")
         if not copy_tar(dump):
+            # if tmp2/done_{dump_name} is not created, skip this dump
             continue
         # extract
         print(dump)
