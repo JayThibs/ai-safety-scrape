@@ -66,33 +66,6 @@ def convert(tex):
 
             return
 
-            # TODO: extract into script
-
-            sh(
-                f"timeout 30s latexml {tex} --dest=tmp/{out_name}.xml --quiet --quiet 2>/dev/null && timeout 10s latexmlpost tmp/{out_name}.xml --mathtex --dest=tmp/{out_name}.html --nographicimages --nopictureimages"
-            )
-            soup = fread(f"tmp/{out_name}.html") >> apply(bs4.BeautifulSoup)
-
-            for x in soup.findAll("table", {"class": "ltx_eqn_table"}):
-                x.name = "div"
-
-            fwrite(f"tmp/{out_name}.html", str(soup))
-
-            sh(
-                f"timeout 10s pandoc -s tmp/{out_name}.html -t markdown_github-raw_html -o out/{out_name}_FALLBACK.md"
-            )
-
-            h = (
-                fread(f"out/{out_name}_FALLBACK.md")
-                >> apply(X.strip())
-                >> apply(X.split("\n"))
-                >> apply(X[:-1])
-                >> join("\n")
-            )
-            fwrite(f"out/{out_name}_FALLBACK.md", h)
-
-            sh(f"rm tmp/{out_name}.html tmp/{out_name}.xml")
-
         except ExitCodeError:
             import traceback
 
