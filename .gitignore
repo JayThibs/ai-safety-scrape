@@ -1,6 +1,12 @@
 tmp
 tmp2
 *.tar.gz
+*.tar
+done/
+errored/
+fallback_needed/
+files/
+out/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
