@@ -98,15 +98,17 @@ def copy_tar(dump):
 
     return False
 
+
 def mv_files_to_root(rootdir="tmp"):
     """Moves all files in root folder subdirectories to root folder."""
     for doc in ls(rootdir):
         if os.path.isdir(doc):
             sh(f"find ./{doc} -type f -print0 | xargs -0 mv -t .")
 
+
 def convert_semiauto(rootdir="tmp"):
     """
-    Converts paper tex files semi-automatically. If there are multiple tex files, 
+    Converts paper tex files semi-automatically. If there are multiple tex files,
     it will check for a list of common "main" file names and use the first one found.
     If there are multiple .tex files and it cannot find a main file, you will be prompted
     to select one.
@@ -125,8 +127,15 @@ def convert_semiauto(rootdir="tmp"):
             # if there are multiple tex files and it's not in the above list: prompt user to select one
             print("Multiple tex files found. Please select the main file: \n")
             print(os.listdir() + "\n")
-            main_tex = int(input(f"Enter the filename here, file extension included (e.g. AIProgress.tex): "))
+            main_tex = int(
+                input(
+                    f"Enter the filename here, file extension included (e.g. AIProgress.tex): "
+                )
+            )
             sh(f"pandoc -s {main_tex} -o {main_tex}.txt --wrap=none")
+
+    os.chdir("..")
+
 
 pool = mp.Pool(mp.cpu_count())
 
@@ -171,64 +180,18 @@ for i, dump in enumerate(tqdm(files)):
                 # if pdf, delete file
                 sh(f"rm {doc}")
 
-        # process
+        # process tex files
 
-        # def tex_files():
-        #     """Yields all tex files in tmp."""
-        #     for doc in ls("tmp"):
-        #         if os.path.isdir(doc):
-        #             for name in [
-        #                 "main",
-        #                 "Main",
-        #                 "MAIN",
-        #                 "paper",
-        #                 "Paper",
-        #             ]:  # common main file names
-        #                 if os.path.exists(doc + "/" + name + ".tex"):
-        #                     yield doc + "/" + name + ".tex"
-        #                     break
-        #             else:
-        #                 if ls(doc) >> filt(X.endswith(".tex")) >> apply(len) == 1:
-        #                     yield ls(doc) >> filt(X.endswith(".tex")) >> one()
-        #                     continue
-
-        #                 # more than one top-level tex file, keep anything with \title
-        #                 for titledoc in ls(doc) >> filt(X.endswith(".tex")):
-        #                     try:
-        #                         if r"\title" in fread(titledoc):
-        #                             yield titledoc
-        #                     except:
-        #                         pass
-        #         elif doc.endswith(".tex"):
-        #             yield doc
-
-
-
-            os.chdir("..")
-                        
-
-
-        for i in range(0,9):
-          if i % 2:
-            match = int(input(f"{os.listdir()}: "))
-            if match == 1:
-                print('It\'s a match!')
-            elif match == 0:
-                print('Not a match!')
-            else:
-                break 
-        
         mv_files_to_root()
         convert_semiauto()
 
         # texfiles = list(tex_files())
         # pool.map(convert, texfiles)
-        
-        sh(f"find ./{sub_dir} -type f -print0 | xargs -0 mv -t .")
         # sh(f"mv {dump} done")
         print(f"marking {dump} as done")
     except:
+        pass
         # sh(f"mv {dump} errored")
 
-pool.close()
-pool.join()
+# pool.close()
+# pool.join()
