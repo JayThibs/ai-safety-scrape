@@ -106,7 +106,7 @@ def mv_files_to_root(rootdir="tmp"):
             sh(f"find ./{doc} -type f -print0 | xargs -0 mv -t .")
 
 
-def convert_semiauto(rootdir="tmp"):
+def convert_semiauto(rootdir="tmp", paper_id=None):
     """
     Converts paper tex files semi-automatically. If there are multiple tex files,
     it will check for a list of common "main" file names and use the first one found.
@@ -118,10 +118,10 @@ def convert_semiauto(rootdir="tmp"):
         doc = doc.split("/")[-1][:-4]
         if len(ls(".")) == 1:
             # if there is only one tex file, just convert it
-            sh(f"pandoc -s {doc}.tex -o {doc}.txt --wrap=none")
+            sh(f"pandoc -s {doc}.tex -o {paper_id}.txt --wrap=none")
         elif doc in ["main", "Main", "MAIN", "paper", "Paper"]:
             # if there is a common main file name, use it
-            sh(f"pandoc -s {doc}.tex -o {doc}.txt --wrap=none")
+            sh(f"pandoc -s {doc}.tex -o {paper_id}.txt --wrap=none")
             break
         else:
             # if there are multiple tex files and it's not in the above list: prompt user to select one
@@ -132,9 +132,11 @@ def convert_semiauto(rootdir="tmp"):
                     f"Enter the filename here, file extension included (e.g. AIProgress.tex): "
                 )
             )
-            sh(f"pandoc -s {main_tex} -o {main_tex}.txt --wrap=none")
+            sh(f"pandoc -s {main_tex} -o {paper_id}.txt --wrap=none")
+            break
 
     os.chdir("..")
+    sh(f"mv tmp/{paper_id}.txt out/")
 
 
 pool = mp.Pool(mp.cpu_count())
