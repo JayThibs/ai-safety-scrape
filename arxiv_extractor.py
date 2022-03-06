@@ -49,8 +49,10 @@ def convert(tex):
         return
 
     try:
-        sh(f"timeout 10s pandoc -s {tex} -o out/{out_name}.md  --wrap=none")
-        print(os.path.exists(f"out/{out_name}.md"))
+        os.chdir("tmp")
+        sh(f"timeout 10s pandoc -s {tex} -o {out_name}.txt --wrap=none")
+        os.chdir("..")
+        sh(f"mv tmp/{out_name}.txt out/{out_name}.txt")
     except ExitCodeError:
         import traceback
 
@@ -117,28 +119,33 @@ for i, dump in enumerate(tqdm(files)):
         print(dump)
         sh(f"tar xf {dump} -C tmp")
 
+        # this loop deletes all files in tmp that are not .tex files
         for doc in lsr("tmp"):
             if doc.endswith(".gz"):
                 sh(f"gunzip {doc}")
                 type = mime.from_file(doc[:-3])
-                #            print(type)
                 if type == "application/x-tar":
+                    # if tarfile, extract in {doc[:-3]}_extract folder and delete tarfile
                     sh(
                         f"mkdir -p {doc[:-3]}_extract && tar xf {doc[:-3]} -C {doc[:-3]}_extract"
                     )
                     sh(f"rm {doc[:-3]}")
                 elif type == "text/x-tex":
+                    # if tex, keep it
                     sh(f"mv {doc[:-3]} {doc[:-3]}.tex")
                 else:
+                    # if not tar or tex, delete file
                     sh(f"rm {doc[:-3]}")
 
             elif doc.endswith(".pdf"):
+                # if pdf, delete file
                 sh(f"rm {doc}")
 
         # process
 
         def tex_files():
-            for doc in ls(ls("tmp")[0]):
+            """Yields all tex files in tmp."""
+            for doc in ls("tmp"):
                 if os.path.isdir(doc):
                     for name in [
                         "main",
