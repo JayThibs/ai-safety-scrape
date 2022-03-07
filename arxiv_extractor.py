@@ -89,6 +89,7 @@ def preextract_tar(dump):
 def copy_tar(dump):
     """Copies tar files from tmp2/{dump_name}/* to tmp/."""
     dump_name = dump.split("/")[-1][:-4]
+    print(dump_name)
     for i in range(120):
         if os.path.exists(f"tmp2/done_{dump_name}"):
             sh(f"mv tmp2/{dump_name}/* tmp")
@@ -113,7 +114,9 @@ def convert_semiauto(rootdir="tmp", paper_id=None):
     If there are multiple .tex files and it cannot find a main file, you will be prompted
     to select one.
     """
+    print('Changing current directory to "tmp"...')
     os.chdir(rootdir)
+    print("Current directory: " + os.getcwd())
     for doc in ls("."):
         doc = doc.split("/")[-1][:-4]
         if len(ls(".")) == 1:
@@ -125,9 +128,9 @@ def convert_semiauto(rootdir="tmp", paper_id=None):
             break
         else:
             # if there are multiple tex files and it's not in the above list: prompt user to select one
-            print("Multiple tex files found. Please select the main file: \n")
-            print(os.listdir() + "\n")
-            main_tex = int(
+            print("Multiple tex files found. Please select the main file: ")
+            print(os.listdir())
+            main_tex = str(
                 input(
                     f"Enter the filename here, file extension included (e.g. AIProgress.tex): "
                 )
@@ -136,10 +139,11 @@ def convert_semiauto(rootdir="tmp", paper_id=None):
             break
 
     os.chdir("..")
+    print("Current directory: " + os.getcwd())
     sh(f"mv tmp/{paper_id}.txt out/")
 
 
-pool = mp.Pool(mp.cpu_count())
+# pool = mp.Pool(mp.cpu_count())
 
 files = ls("files")
 
@@ -162,6 +166,7 @@ for i, dump in enumerate(tqdm(files)):
 
         # this loop deletes all files in tmp that are not .tex files
         for doc in lsr("tmp"):
+
             if doc.endswith(".gz"):
                 sh(f"gunzip {doc}")
                 type = mime.from_file(doc[:-3])
@@ -178,14 +183,21 @@ for i, dump in enumerate(tqdm(files)):
                     # if not tar or tex, delete file
                     sh(f"rm {doc[:-3]}")
 
-            elif doc.endswith(".pdf"):
-                # if pdf, delete file
+            elif doc.endswith(".tex"):
+                # if tex, keep it
+                sh(f"mv {doc} {doc}")
+
+            else:
+                # if not .tex, delete file
                 sh(f"rm {doc}")
 
         # process tex files
-
+        paper_id = dump.split("/")[-1][:-4]
+        print("Processing paper_id:", paper_id)
+        print("Moving files to root folder...")
         mv_files_to_root()
-        convert_semiauto()
+        print("Converting paper...")
+        convert_semiauto(paper_id=paper_id)
 
         # texfiles = list(tex_files())
         # pool.map(convert, texfiles)
