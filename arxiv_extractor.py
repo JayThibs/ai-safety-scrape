@@ -127,7 +127,7 @@ def convert_semiauto(rootdir="tmp", paper_id=None):
             # if there is only one tex file, just convert it
             main_match = True
             doc = ls(".")[0].split("/")[-1]
-            sh(f"timeout 7s pandoc -s {doc} -o {paper_id}.txt --wrap=none")
+            sh(f"timeout 7s pandoc -s {doc} -o {paper_id}.md --wrap=none")
         else:
             for doc in ls("."):
                 doc = doc.split("/")[-1][:-4]
@@ -135,7 +135,7 @@ def convert_semiauto(rootdir="tmp", paper_id=None):
                 if doc in ["main", "Main", "MAIN", "paper", "Paper"]:
                     # if there is a common main file name, use it
                     main_match = True
-                    sh(f"timeout 7s pandoc -s {doc}.tex -o {paper_id}.txt --wrap=none")
+                    sh(f"timeout 7s pandoc -s {doc}.tex -o {paper_id}.md --wrap=none")
                     break
         if not main_match:
             # if there are multiple tex files and it's not in the above list: prompt user to select one
@@ -154,11 +154,11 @@ def convert_semiauto(rootdir="tmp", paper_id=None):
                 json.dump(main_tex_dict, open("main_tex_dict.json", "w"))
                 os.chdir(rootdir)
 
-            sh(f"timeout 7s pandoc -s {main_tex} -o {paper_id}.txt --wrap=none")
+            sh(f"timeout 7s pandoc -s {main_tex} -o {paper_id}.md --wrap=none")
 
         os.chdir("..")
         print("Current directory: " + os.getcwd())
-        sh(f"mv tmp/{paper_id}.txt out/{paper_id}.txt")
+        sh(f"mv tmp/{paper_id}.md out/{paper_id}.md")
 
     except ExitCodeError:
         traceback.print_exc()
