@@ -116,27 +116,32 @@ def convert_semiauto(rootdir="tmp", paper_id=None):
     """
     print('Changing current directory to "tmp"...')
     os.chdir(rootdir)
+    main_match = False
     print("Current directory: " + os.getcwd())
-    for doc in ls("."):
-        doc = doc.split("/")[-1][:-4]
-        if len(ls(".")) == 1:
-            # if there is only one tex file, just convert it
-            sh(f"pandoc -s {doc}.tex -o {paper_id}.txt --wrap=none")
-        elif doc in ["main", "Main", "MAIN", "paper", "Paper"]:
-            # if there is a common main file name, use it
-            sh(f"pandoc -s {doc}.tex -o {paper_id}.txt --wrap=none")
-            break
-        else:
-            # if there are multiple tex files and it's not in the above list: prompt user to select one
-            print("Multiple tex files found. Please select the main file: ")
-            print(os.listdir())
-            main_tex = str(
-                input(
-                    f"Enter the filename here, file extension included (e.g. AIProgress.tex): "
-                )
+    if len(ls(".")) == 1:
+        # if there is only one tex file, just convert it
+        main_match = True
+        doc = ls(".")[0].split("/")[-1]
+        sh(f"pandoc -s {doc} -o {paper_id}.txt --wrap=none")
+    else:
+        for doc in ls("."):
+            doc = doc.split("/")[-1][:-4]
+            print(doc)
+            if doc in ["main", "Main", "MAIN", "paper", "Paper"]:
+                # if there is a common main file name, use it
+                main_match = True
+                sh(f"pandoc -s {doc}.tex -o {paper_id}.txt --wrap=none")
+                break
+    if not main_match:
+        # if there are multiple tex files and it's not in the above list: prompt user to select one
+        print("Multiple tex files found. Please select the main file: ")
+        print(os.listdir())
+        main_tex = str(
+            input(
+                f"Enter the filename here, file extension included (e.g. AIProgress.tex): "
             )
-            sh(f"pandoc -s {main_tex} -o {paper_id}.txt --wrap=none")
-            break
+        )
+        sh(f"pandoc -s {main_tex} -o {paper_id}.txt --wrap=none")
 
     os.chdir("..")
     print("Current directory: " + os.getcwd())
