@@ -103,6 +103,7 @@ def mv_files_to_root(rootdir="tmp"):
     for doc in ls(rootdir):
         if os.path.isdir(doc):
             sh(f"find ./{doc} -type f -print0 | xargs -0 mv -t .")
+            sh(f"rm -rf {doc}")
 
 
 def convert_semiauto(rootdir="tmp", paper_id=None):
