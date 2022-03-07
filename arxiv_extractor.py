@@ -9,6 +9,7 @@ import chardet
 import bs4
 import time
 from tqdm import tqdm
+import json
 import traceback
 
 
@@ -112,6 +113,10 @@ def convert_semiauto(rootdir="tmp", paper_id=None):
     to select one.
     """
     print('Changing current directory to "tmp"...')
+    if os.path.exists("main_tex_dict.json"):
+        main_tex_dict = json.load(open("main_tex_dict.json"))
+    else:
+        main_tex_dict = {}
     os.chdir(rootdir)
     main_match = False
     print("Current directory: " + os.getcwd())
@@ -135,16 +140,24 @@ def convert_semiauto(rootdir="tmp", paper_id=None):
             # if there are multiple tex files and it's not in the above list: prompt user to select one
             print("Multiple tex files found. Please select the main file: ")
             print(os.listdir())
-            main_tex = str(
-                input(
-                    f"Enter the filename here, file extension included (e.g. AIProgress.tex): "
+            if paper_id in main_tex_dict:
+                main_tex = main_tex_dict[paper_id]
+            else:
+                main_tex = str(
+                    input(
+                        f"Enter the filename here, file extension included (e.g. AIProgress.tex): "
+                    )
                 )
-            )
+                main_tex_dict[paper_id] = main_tex
+                os.chdir("..")
+                json.dump(main_tex_dict, open("main_tex_dict.json", "w"))
+                os.chdir(rootdir)
+
             sh(f"timeout 10s pandoc -s {main_tex} -o {paper_id}.txt --wrap=none")
 
-        print("Current directory: " + os.getcwd())
-        sh(f"mv tmp/{paper_id}.txt out/")
         os.chdir("..")
+        print("Current directory: " + os.getcwd())
+        sh(f"mv tmp/{paper_id}.txt out/{paper_id}.txt")
 
     except ExitCodeError:
         traceback.print_exc()
