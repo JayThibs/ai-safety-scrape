@@ -118,31 +118,50 @@ def convert_semiauto(rootdir="tmp", paper_id=None):
     os.chdir(rootdir)
     main_match = False
     print("Current directory: " + os.getcwd())
-    if len(ls(".")) == 1:
-        # if there is only one tex file, just convert it
-        main_match = True
-        doc = ls(".")[0].split("/")[-1]
-        sh(f"pandoc -s {doc} -o {paper_id}.txt --wrap=none")
-    else:
-        for doc in ls("."):
-            doc = doc.split("/")[-1][:-4]
-            print(doc)
-            if doc in ["main", "Main", "MAIN", "paper", "Paper"]:
-                # if there is a common main file name, use it
-                main_match = True
-                sh(f"pandoc -s {doc}.tex -o {paper_id}.txt --wrap=none")
-                break
-    if not main_match:
-        # if there are multiple tex files and it's not in the above list: prompt user to select one
-        print("Multiple tex files found. Please select the main file: ")
-        print(os.listdir())
-        main_tex = str(
-            input(
-                f"Enter the filename here, file extension included (e.g. AIProgress.tex): "
-            )
-        )
-        sh(f"pandoc -s {main_tex} -o {paper_id}.txt --wrap=none")
 
+    try:
+        if len(ls(".")) == 1:
+            # if there is only one tex file, just convert it
+            main_match = True
+            doc = ls(".")[0].split("/")[-1]
+            sh(f"pandoc -s {doc} -o {paper_id}.txt --wrap=none")
+        else:
+            for doc in ls("."):
+                doc = doc.split("/")[-1][:-4]
+                print(doc)
+                if doc in ["main", "Main", "MAIN", "paper", "Paper"]:
+                    # if there is a common main file name, use it
+                    main_match = True
+                    sh(f"pandoc -s {doc}.tex -o {paper_id}.txt --wrap=none")
+                    break
+        if not main_match:
+            # if there are multiple tex files and it's not in the above list: prompt user to select one
+            print("Multiple tex files found. Please select the main file: ")
+            print(os.listdir())
+            main_tex = str(
+                input(
+                    f"Enter the filename here, file extension included (e.g. AIProgress.tex): "
+                )
+            )
+            sh(f"pandoc -s {main_tex} -o {paper_id}.txt --wrap=none")
+
+    except ExitCodeError:
+        import traceback
+
+        traceback.print_exc()
+        print("Error converting paper. Moving to fallback pile...")
+        if os.getcwd() == "tmp":
+            os.chdir("..")
+        # fallback:
+        try:
+            # move to fallback pile so we can handle it later
+            sh(
+                f"mkdir -p fallback_needed/{paper_id} && mv .* fallback_needed/{paper_id}/"
+            )
+        except ExitCodeError:
+            import traceback
+
+            traceback.print_exc()
     os.chdir("..")
     print("Current directory: " + os.getcwd())
     sh(f"mv tmp/{paper_id}.txt out/")
