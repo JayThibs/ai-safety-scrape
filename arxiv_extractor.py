@@ -164,14 +164,17 @@ for i, dump in enumerate(tqdm(files)):
         # extract
         print(dump)
         sh(f"tar xf {dump} -C tmp")
-        print(lsr("tmp"))
         # replace special characters in file names with underscores
-        for doc in os.listdir("tmp"):
+        os.chdir("tmp")
+        for doc in os.listdir():
+            print(doc)
             if os.path.isdir(doc):
                 new_doc_name = doc.translate(
                     {ord(c): "_" for c in " !@#$%^&*()[]{};:,<>?\|`~-=+"}
                 )
-                sh(f"mv {doc} {new_doc_name}")
+                if new_doc_name != doc:
+                    os.rename(doc, new_doc_name)
+        os.chdir("..")
         # this loop deletes all files in tmp that are not .tex files
         for doc in lsr("tmp"):
             print(doc)
