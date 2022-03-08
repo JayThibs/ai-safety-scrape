@@ -35,44 +35,6 @@ def any_to_utf8(b):
             return
 
 
-def convert(tex):
-    print(tex)
-    out_name = tex.split("/")[2:] >> join("_")
-
-    try:
-        with open(tex, "rb") as fh:
-            b = fh.read()
-            cont = any_to_utf8(b)
-            if cont is None:
-                return
-        fwrite(tex, cont)
-    except FileNotFoundError:
-        # ???
-
-        return
-
-    try:
-        os.chdir("tmp")
-        sh(f"timeout 10s pandoc -s {tex} -o {out_name}.txt --wrap=none")
-        os.chdir("..")
-        sh(f"mv tmp/{out_name}.txt out/{out_name}.txt")
-    except ExitCodeError:
-        traceback.print_exc()
-        # fallback:
-        try:
-            # move to fallback pile so we can handle it later
-            if "_extract" in tex.split("/")[:-1] >> join("/"):
-                loc = tex.split("/")[:-1] >> join("/")
-            else:
-                loc = tex
-            sh(f"mv {loc} fallback_needed/")
-
-            return
-
-        except ExitCodeError:
-            traceback.print_exc()
-
-
 def preextract_tar(dump):
     """
     Creates tmp2/{dump_name} directory and extracts tar files and copies them to tmp2/dump_name/*.
@@ -101,9 +63,15 @@ def copy_tar(dump):
 def mv_files_to_root(rootdir="tmp"):
     """Moves all files in root folder subdirectories to root folder."""
     for doc in ls(rootdir):
-        if os.path.isdir(doc):
-            sh(f"find ./{doc} -type f -print0 | xargs -0 mv -t .")
-            sh(f"rm -rf {doc}")
+        try:
+            if os.path.isdir(doc):
+                sh(f"find ./{doc} -type f -print0 | xargs -0 mv -t .")
+                sh(f"rm -rf {doc}")
+        except ExitCodeError:
+            traceback.print_exc()
+            print(
+                "Error moving files to root folder. Likely because there's a file with the same name in the root folder."
+            )
 
 
 def convert_semiauto(rootdir="tmp", paper_id=None):
@@ -121,6 +89,7 @@ def convert_semiauto(rootdir="tmp", paper_id=None):
     os.chdir(rootdir)
     main_match = False
     print("Current directory: " + os.getcwd())
+    print("paper_id: " + paper_id)
 
     try:
         if len(ls(".")) == 1:
@@ -195,33 +164,44 @@ for i, dump in enumerate(tqdm(files)):
         # extract
         print(dump)
         sh(f"tar xf {dump} -C tmp")
-
+        print(lsr("tmp"))
+        # replace special characters in file names with underscores
+        for doc in os.listdir("tmp"):
+            if os.path.isdir(doc):
+                new_doc_name = doc.translate(
+                    {ord(c): "_" for c in " !@#$%^&*()[]{};:,<>?\|`~-=+"}
+                )
+                sh(f"mv {doc} {new_doc_name}")
         # this loop deletes all files in tmp that are not .tex files
         for doc in lsr("tmp"):
+            print(doc)
+            try:
+                if doc.endswith(".gz"):
+                    sh(f"gunzip {doc}")
+                    type = mime.from_file(doc[:-3])
+                    if type == "application/x-tar":
+                        # if tarfile, extract in {doc[:-3]}_extract folder and delete tarfile
+                        sh(
+                            f"mkdir -p {doc[:-3]}_extract && tar xf {doc[:-3]} -C {doc[:-3]}_extract"
+                        )
+                        sh(f"rm {doc[:-3]}")
+                    elif type == "text/x-tex":
+                        # if tex, keep it
+                        sh(f"mv {doc[:-3]} {doc[:-3]}.tex")
+                    else:
+                        # if not tar or tex, delete file
+                        sh(f"rm {doc[:-3]}")
 
-            if doc.endswith(".gz"):
-                sh(f"gunzip {doc}")
-                type = mime.from_file(doc[:-3])
-                if type == "application/x-tar":
-                    # if tarfile, extract in {doc[:-3]}_extract folder and delete tarfile
-                    sh(
-                        f"mkdir -p {doc[:-3]}_extract && tar xf {doc[:-3]} -C {doc[:-3]}_extract"
-                    )
-                    sh(f"rm {doc[:-3]}")
-                elif type == "text/x-tex":
+                elif doc.endswith(".tex"):
                     # if tex, keep it
-                    sh(f"mv {doc[:-3]} {doc[:-3]}.tex")
+                    sh(f"mv {doc} {doc}")
+
                 else:
-                    # if not tar or tex, delete file
-                    sh(f"rm {doc[:-3]}")
-
-            elif doc.endswith(".tex"):
-                # if tex, keep it
-                sh(f"mv {doc} {doc}")
-
-            else:
-                # if not .tex, delete file
-                sh(f"rm {doc}")
+                    # if not .tex, delete file
+                    sh(f"rm {doc}")
+            except ExitCodeError:
+                traceback.print_exc()
+                print(f"Error deleting file: {doc}")
 
         # process tex files
         paper_id = dump.split("/")[-1][:-4]
