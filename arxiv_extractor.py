@@ -3,10 +3,8 @@ from utils import *
 import magic
 
 mime = magic.Magic(mime=True)
-import re
 import multiprocessing as mp
 import chardet
-import bs4
 import time
 from tqdm import tqdm
 import json

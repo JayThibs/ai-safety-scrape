@@ -1,5 +1,4 @@
 import os
-import json
 from functools import reduce
 import operator
 import lm_dataformat as lmd
