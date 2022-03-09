@@ -154,8 +154,6 @@ def convert_semiauto(rootdir="tmp", paper_id=None):
             traceback.print_exc()
 
 
-# pool = mp.Pool(mp.cpu_count())
-
 files = ls("files")
 
 sh("rm -rf tmp/* tmp2/*")
