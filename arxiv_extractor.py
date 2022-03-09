@@ -92,6 +92,7 @@ def convert_semiauto(rootdir="tmp", paper_id=None):
     print("paper_id: " + paper_id)
 
     try:
+        assert len(ls(".")) > 0
         if len(ls(".")) == 1:
             # if there is only one tex file, just convert it
             main_match = True
@@ -101,6 +102,17 @@ def convert_semiauto(rootdir="tmp", paper_id=None):
             for doc in ls("."):
                 doc = doc.split("/")[-1][:-4]
                 print(doc)
+                try:
+                    with open(doc, "rb") as fh:
+                        b = fh.read()
+                        cont = any_to_utf8(b)
+                        if cont is None:
+                            return
+                    fwrite(doc, cont)
+                except ExitCodeError:
+                    traceback.print_exc()
+                    print(f"Error converting {doc}, will go to /fallback_needed.")
+
                 if doc in ["main", "Main", "MAIN", "paper", "Paper"]:
                     # if there is a common main file name, use it
                     main_match = True
