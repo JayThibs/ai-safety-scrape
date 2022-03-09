@@ -224,13 +224,8 @@ for i, dump in enumerate(tqdm(files)):
         print("Converting paper...")
         convert_semiauto(paper_id=paper_id)
 
-        # texfiles = list(tex_files())
-        # pool.map(convert, texfiles)
         sh(f"mv {dump} done")
         print(f"marking {dump} as done")
     except:
         pass
         sh(f"mv {dump} errored")
-
-# pool.close()
-# pool.join()
