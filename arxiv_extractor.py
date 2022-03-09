@@ -20,17 +20,31 @@ def any_to_utf8(b):
         return b.decode("utf-8")
     except UnicodeDecodeError:
         # try to figure out encoding if not utf-8
-
         guess = chardet.detect(b)["encoding"]
-
         if not guess or guess == "UTF-8":
             return
-
         try:
             return b.decode(guess)
         except (UnicodeDecodeError, LookupError):
             # still cant figure out encoding, give up
             return
+
+
+def convert_to_utf8(rootdir="."):
+    """Converts all files in root folder to utf-8."""
+    for doc in ls(rootdir):
+        if doc.endswith(".tex"):
+            try:
+                with open(doc, "rb") as fh:
+                    b = fh.read()
+                    cont = any_to_utf8(b)
+                    if cont is None:
+                        return
+                fwrite(doc, cont)
+            except ExitCodeError:
+                traceback.print_exc()
+                print(f"Error converting {doc}, will go to /fallback_needed.")
+                print("Error converting files to utf-8.")
 
 
 def preextract_tar(dump):
@@ -91,6 +105,7 @@ def convert_semiauto(rootdir="tmp", paper_id=None):
 
     try:
         assert len(ls(".")) > 0
+        convert_to_utf8(rootdir=".")
         if len(ls(".")) == 1:
             # if there is only one tex file, just convert it
             main_match = True
@@ -100,17 +115,6 @@ def convert_semiauto(rootdir="tmp", paper_id=None):
             for doc in ls("."):
                 doc = doc.split("/")[-1][:-4]
                 print(doc)
-                try:
-                    with open(doc, "rb") as fh:
-                        b = fh.read()
-                        cont = any_to_utf8(b)
-                        if cont is None:
-                            return
-                    fwrite(doc, cont)
-                except ExitCodeError:
-                    traceback.print_exc()
-                    print(f"Error converting {doc}, will go to /fallback_needed.")
-
                 if doc in ["main", "Main", "MAIN", "paper", "Paper"]:
                     # if there is a common main file name, use it
                     main_match = True
@@ -139,7 +143,7 @@ def convert_semiauto(rootdir="tmp", paper_id=None):
         print("Current directory: " + os.getcwd())
         sh(f"mv tmp/{paper_id}.md out/{paper_id}.md")
 
-    except ExitCodeError:
+    except:
         traceback.print_exc()
         print("Error converting paper. Moving to fallback pile...")
         if os.getcwd().split("/")[-1] == "tmp":
@@ -152,6 +156,8 @@ def convert_semiauto(rootdir="tmp", paper_id=None):
             )
         except ExitCodeError:
             traceback.print_exc()
+
+        assert os.path.exists(f"out/{paper_id}.md")  # to send tar to errored pile
 
 
 files = ls("files")
@@ -225,5 +231,5 @@ for i, dump in enumerate(tqdm(files)):
         sh(f"mv {dump} done")
         print(f"marking {dump} as done")
     except:
-        pass
         sh(f"mv {dump} errored")
+        pass
