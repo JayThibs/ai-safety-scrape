@@ -1,0 +1,1030 @@
+Introduction
+
+[image]
+
+Recent breakthroughs in general-purpose language modeling have
+demonstrated the effectiveness of training massive models on large text
+corpora for downstream applications . As the field continues to scale up
+language model training, the demand for high-quality massive text data
+will continue to grow .
+
+The growing need for data in language modeling has caused most existing
+large-scale language models to turn to the Common Crawl for most or all
+of their data . While training on the Common Crawl has been effective,
+recent work has shown that dataset diversity leads to better downstream
+generalization capability . Additionally, large-scale language models
+have been shown to effectively acquire knowledge in a novel domain with
+only relatively small amounts of training data from that domain . These
+results suggest that by mixing together a large number of smaller, high
+quality, diverse datasets, we can improve the general cross-domain
+knowledge and downstream generalization capabilities of the model
+compared to models trained on only a handful of data sources.
+
+To address this need, we introduce the Pile: a 825.18 GiB English text
+dataset designed for training large scale language models. The Pile is
+composed of 22 diverse and high-quality datasets, including both
+established natural language processing datasets and several newly
+introduced ones. In addition to its utility in training large language
+models, the Pile can also serve as a broad-coverage benchmark for
+cross-domain knowledge and generalization ability of language models.
+
+We introduce new datasets derived from the following sources: PubMed
+Central, ArXiv, GitHub, the FreeLaw Project, Stack Exchange, the US
+Patent and Trademark Office, PubMed, Ubuntu IRC, HackerNews, YouTube,
+PhilPapers, and NIH ExPorter. We also introduce OpenWebText2 and
+BookCorpus2, which are extensions of the original OpenWebText and
+BookCorpus datasets, respectively.
+
+In addition, we incorporate several existing high-quality datasets:
+Books3 , Project Gutenberg (PG-19) , OpenSubtitles , English Wikipedia,
+DM Mathematics , EuroParl , and the Enron Emails corpus . To supplement
+these, we also introduce a new filtered subset of Common Crawl, Pile-CC,
+with improved extraction quality.
+
+Through our analyses, we confirm that the Pile is significantly distinct
+from pure Common Crawl data. Additionally, our evaluations show that the
+existing GPT-2 and GPT-3 models perform poorly on many components of the
+Pile, and that models trained on the Pile significantly outperform both
+raw and filtered Common Crawl models. To complement the performance
+evaluations, we also perform an exploratory analysis of the text within
+the Pile to provide a detailed picture of the data. We hope that our
+extensive documentation of the construction and characteristics of the
+Pile will help researchers make informed decisions about potential
+downstream applications.
+
+Finally, we make publicly available the preprocessing code for the
+constituent datasets of the Pile and the code for constructing
+alternative versions[2]. In the interest of reproducibility, we also
+document all processing performed on each dataset (and the Pile as a
+whole) in as much detail as possible. For further details about the
+processing of each dataset, see and Appendix [apdx:data].
+
+Contributions
+
+The core contributions of this paper are:
+
+1.  The introduction of a 825.18 GiB english-language dataset for
+    language modeling combining 22 diverse sources.
+
+2.  The introduction of 14 new language modeling datasets, which we
+    expect to be of independent interest to researchers.
+
+3.  Evaluations demonstrating significant improvements across many
+    domains by GPT-2-sized models trained on this new dataset, compared
+    to training on CC-100 and raw Common Crawl.
+
+4.  The investigation and documentation of this dataset, which we hope
+    will better inform researchers about how to use it as well as
+    motivate them to undertake similar investigations of their own data.
+
+The Pile Datasets
+
+  Component               Raw Size   Weight   Epochs   Effective Size   Mean Document Size
+  ------------------- ------------ -------- -------- ---------------- --------------------
+  Pile-CC               227.12 GiB   18.11%      1.0       227.12 GiB             4.33 KiB
+  PubMed Central         90.27 GiB   14.40%      2.0       180.55 GiB            30.55 KiB
+  Books3                100.96 GiB   12.07%      1.5       151.44 GiB           538.36 KiB
+  OpenWebText2           62.77 GiB   10.01%      2.0       125.54 GiB             3.85 KiB
+  ArXiv                  56.21 GiB    8.96%      2.0       112.42 GiB            46.61 KiB
+  Github                 95.16 GiB    7.59%      1.0        95.16 GiB             5.25 KiB
+  FreeLaw                51.15 GiB    6.12%      1.5        76.73 GiB            15.06 KiB
+  Stack Exchange         32.20 GiB    5.13%      2.0        64.39 GiB             2.16 KiB
+  USPTO Backgrounds      22.90 GiB    3.65%      2.0        45.81 GiB             4.08 KiB
+  PubMed Abstracts       19.26 GiB    3.07%      2.0        38.53 GiB             1.30 KiB
+  Gutenberg (PG-19)      10.88 GiB    2.17%      2.5        27.19 GiB           398.73 KiB
+  OpenSubtitles          12.98 GiB    1.55%      1.5        19.47 GiB            30.48 KiB
+  Wikipedia (en)          6.38 GiB    1.53%      3.0        19.13 GiB             1.11 KiB
+  DM Mathematics          7.75 GiB    1.24%      2.0        15.49 GiB             8.00 KiB
+  Ubuntu IRC              5.52 GiB    0.88%      2.0        11.03 GiB           545.48 KiB
+  BookCorpus2             6.30 GiB    0.75%      1.5         9.45 GiB           369.87 KiB
+  EuroParl                4.59 GiB    0.73%      2.0         9.17 GiB            68.87 KiB
+  HackerNews              3.90 GiB    0.62%      2.0         7.80 GiB             4.92 KiB
+  YoutubeSubtitles        3.73 GiB    0.60%      2.0         7.47 GiB            22.55 KiB
+  PhilPapers              2.38 GiB    0.38%      2.0         4.76 GiB            73.37 KiB
+  NIH ExPorter            1.89 GiB    0.30%      2.0         3.79 GiB             2.11 KiB
+  Enron Emails            0.88 GiB    0.14%      2.0         1.76 GiB             1.78 KiB
+  The Pile              825.18 GiB                        1254.20 GiB             5.91 KiB
+
+The Pile is composed of 22 constituent sub-datasets, as shown in .
+Following , we increase the weights of higher quality components, with
+certain high-quality datasets such as Wikipedia being seen up to 3 times
+(“epochs”) for each full epoch over the Pile. Detailed information about
+the construction of each dataset is available in Appendix [apdx:data].
+
+Pile-CC
+
+Common Crawl is a collection of website crawls from 2008 onwards,
+including raw web pages, metadata and text extractions. Due to the raw
+nature of the dataset, Common Crawl has the advantage of including text
+from diverse domains, but at the cost of varying quality data. Due to
+this, use of Common Crawl typically necessitates well-designed
+extraction and filtering. Our Common Crawl-based dataset, Pile-CC, uses
+jusText on Web Archive files (raw HTTP responses including page HTML)
+for extraction, which yields higher quality output than directly using
+the WET files (extracted plaintext).
+
+PubMed Central
+
+PubMed Central (PMC) is a subset of the PubMed online repository for
+biomedical articles run by the United States of America’s National
+Center for Biotechnology Information (NCBI), providing open, full-text
+access to nearly five million publications. Most publications indexed by
+PMC are recent, and their inclusion is mandated for all NIH funded
+research starting from 2008 by the NIH Public Access Policy. We included
+PMC in the hopes that it will benefit potential downstream applications
+to the medical domain.
+
+Books3
+
+Books3 is a dataset of books derived from a copy of the contents of the
+Bibliotik private tracker made available by Shawn Presser . Bibliotik
+consists of a mix of fiction and nonfiction books and is almost an order
+of magnitude larger than our next largest book dataset (BookCorpus2).We
+included Bibliotik because books are invaluable for long-range context
+modeling research and coherent storytelling.
+
+OpenWebText2
+
+OpenWebText2 (OWT2) is a generalized web scrape dataset inspired by
+WebText and OpenWebTextCorpus . Similar to the original WebText, we use
+net upvotes on Reddit submissions as a proxy for outgoing link quality.
+OpenWebText2 includes more recent content from Reddit submissions up
+until 2020, content from multiple languages, document metadata, multiple
+dataset versions, and open source replication code. We included OWT2 as
+a high quality general purpose dataset.
+
+ArXiv
+
+ArXiv is a preprint server for research papers that has operated since
+1991. As shown in [fig:arXiv], arXiv papers are predominantly in the
+fields of Math, Computer Science, and Physics. We included arXiv in the
+hopes that it will be a source of high quality text and math knowledge,
+and benefit potential downstream applications to research in these
+areas. ArXiv papers are written in LaTeX, a common typesetting language
+for mathematics, computer science, physics, and some adjacent fields.
+Training a language model to be able to generate papers written in LaTeX
+could be a huge boon to the research community.
+
+GitHub
+
+GitHub is a large corpus of open-source code repositories. Motivated by
+the ability of GPT-3 to generate plausible code completions despite its
+training data not containing any explicitly gathered code datasets, we
+included GitHub in the hopes that it would enable better downstream
+performance on code-related tasks.
+
+FreeLaw
+
+The Free Law Project is a US-registered non-profit that provides access
+to and analytical tools for academic studies in the legal realm.
+CourtListener,[3] part of the Free Law Project, provides bulk downloads
+for millions of legal opinions from federal and state courts. While the
+full dataset provides multiple modalities of legal proceedings,
+including dockets, bibliographic information on judges, and other
+metadata, we focused specifically on court opinions due to an abundance
+of full-text entries. This data is entirely within the public domain.
+
+Stack Exchange
+
+The Stack Exchange Data Dump[4] contains an anonymized set of all
+user-contributed content on the Stack Exchange network, a popular
+collection of websites centered around user-contributed questions and
+answers. It is one of the largest publicly available repositories of
+question-answer pairs, and covers a wide range of subjects—from
+programming, to gardening, to Buddhism. We included Stack Exchange in
+the hopes that it will improve the question answering capabilities of
+downstream models on diverse domains.
+
+USPTO Backgrounds
+
+USPTO Backgrounds is a dataset of background sections from patents
+granted by the United States Patent and Trademark Office, derived from
+its published bulk archives[5]. A typical patent background lays out the
+general context of the invention, gives an overview of the technical
+field, and sets up the framing of the problem space. We included USPTO
+Backgrounds because it contains a large volume of technical writing on
+applied subjects, aimed at a non-technical audience.
+
+Wikipedia (English)
+
+Wikipedia is a standard source of high-quality text for language
+modeling. In addition to being a source of high quality, clean English
+text, it is also valuable as it is written in expository prose, and
+spans many domains.
+
+PubMed Abstracts
+
+PubMed Abstracts consists of the abstracts from 30 million publications
+in PubMed, the online repository for biomedical articles run by the
+National Library of Medicine. While the PMC (see Section 2.2) provides
+full-text access, the subset of coverage is significantly limited and
+biased towards recent publications. PubMed also incorporates MEDLINE,
+which expands the coverage of biomedical abstracts from 1946 to present
+day.
+
+Project Gutenberg
+
+Project Gutenberg is a dataset of classic Western literature. The
+specific Project Gutenberg derived dataset we used, PG-19, consists of
+Project Gutenberg books from before 1919 , which represent distinct
+styles from the more modern Books3 and BookCorpus. Additionally, the
+PG-19 dataset is already being used for long-distance context modeling.
+
+OpenSubtitles
+
+The OpenSubtitles dataset is an English language dataset of subtitles
+from movies and television shows gathered by . Subtitles provide an
+important source of natural dialog, as well as an understanding of
+fictional formats other than prose, which may prove useful for creative
+writing generation tasks such as screenwriting, speechwriting, and
+interactive storytelling.
+
+DeepMind Mathematics
+
+The DeepMind Mathematics dataset consists of a collection of
+mathematical problems from topics such as algebra, arithmetic, calculus,
+number theory, and probability, formatted as natural language prompts .
+One major weakness of large language models has been performance on
+mathematical tasks , which may be due in part to a lack of math problems
+in the training set. By explicitly including a dataset of mathematical
+problems, we hope to improve the mathematical ability of language models
+trained on the Pile.
+
+BookCorpus2
+
+BookCorpus2 is an expanded version of the original BookCorpus , a widely
+used language modeling corpus consisting of books written by “as of yet
+unpublished authors.” BookCorpus is therefore unlikely to have
+significant overlap with Project Gutenberg and Books3, which consist of
+published books. BookCorpus is also commonly used as dataset for
+training language models .
+
+Ubuntu IRC
+
+The Ubuntu IRC dataset is derived from the publicly available
+chatlogs[6] of all Ubuntu-related channels on the Freenode IRC chat
+server. Chatlog data provides an opportunity to model real-time human
+interactions, which feature a level of spontaneity not typically found
+in other modes of social media.
+
+EuroParl
+
+EuroParl is a multilingual parallel corpus originally introduced for
+machine translation but which has also seen use in several other fields
+of NLP . We use the most current version at time of writing, which
+consists of the proceedings of the European Parliament in 21 European
+languages from 1996 until 2012.
+
+YouTube Subtitles
+
+The YouTube Subtitles dataset is a parallel corpus of text gathered from
+human generated closed-captions on YouTube. In addition to providing
+multilingual data, Youtube Subtitles is also a source of educational
+content, popular culture, and natural dialog.
+
+PhilPapers
+
+The PhilPapers[7] dataset consists of open-access philosophy
+publications from an international database maintained by the Center for
+Digital Philosophy at the University of Western Ontario. We included
+PhilPapers because it spans a wide body of abstract, conceptual
+discourse, and its articles contain high quality academic writing.
+
+NIH Grant Abstracts: ExPORTER
+
+The NIH Grant abstracts provides a bulk-data repository for awarded
+applications through the ExPORTER[8] service covering the fiscal years
+1985-present. We included the dataset because it contains examples of
+high-quality scientific writing.
+
+Hacker News
+
+Hacker News[9] is a link aggregator operated by Y Combinator, a startup
+incubator and investment fund. Users submit articles defined as
+“anything that gratifies one’s intellectual curiosity,” but submitted
+articles tend to focus on topics in computer science and
+entrepreneurship. Users can comment on submitted stories, resulting in
+comment trees discussing and critiquing submitted stories. We scrape,
+parse, and include these comment trees since we believe they provide
+high quality dialogue and debate on niche topics.
+
+Enron Emails
+
+The Enron Emails dataset is a valuable corpus commonly used for research
+about the usage patterns of email. We included Enron Emails to aid in
+understanding the modality of email communications, which is typically
+not found in any of our other datasets.
+
+Benchmarking Language Models with the Pile
+
+While the Pile was conceived as a training dataset for large-scale
+language models, its coverage of multiple disparate domains makes it
+also suitable as an evaluation dataset. In this section, we describe how
+the Pile can be used as a broad-coverage dataset for benchmarking
+language models.
+
+Benchmarking Guidelines
+
+The Pile is provided as train, validation, and testing splits. The
+validation and testing components each contain 0.1% of the data, sampled
+uniformly at random. While this is a far smaller percentage than most
+datasets, the sheer size of the dataset results in over 1 GiB of
+validation and testing data each. We highlight that while we have made
+efforts to deduplicate documents within the Pile (See:
+Section [apdx:deduplication]), it is still possible that some documents
+are duplicated across the train/validation/test splits.
+
+Our preferred metric is bits per UTF-8 encoded byte (BPB). Bits per byte
+is preferred over bits per character or perplexity when using Pile as a
+metric due to its invariance to different tokenization schemes and the
+ambiguity of measuring characters in Unicode. To compute bits per byte
+from a given negative log likelihood loss ℓ, we compute
+$\textsc{bpb} = (L_T/L_B) \log_2(e^\ell) = (L_T/L_B) \ell / \ln(2)$,
+where L_(T) is the length of the dataset in tokens and L_(B) is the
+length of the dataset in UTF-8 encoded bytes. We find that L_(T)/L_(B)
+is 0.29335 GPT-2-tokens/byte across the Pile; dataset-specific values of
+L_(T)/L_(B) can be found in Table [tbl:bpb_conversion].
+
+Test Perplexity with GPT-2 and GPT-3
+
+We compute the test perplexity of the constituent datasets of the Pile
+using GPT-2 and GPT-3 , shown in Figure [table:pile_perplexity_utf8]. We
+use all available versions of GPT-2, and all four versions of GPT-3
+available via the OpenAI API. Because of the cost associated with using
+the OpenAI API, we evaluate on one-tenth of the respective test sets for
+most of the constituent datasets. We report the perplexity converted to
+bits per UTF-8 encoded byte (BPB). Importantly, we compute perplexity by
+evaluating each document independently within each dataset, as opposed
+to concatenating all documents as is common practice for computing
+perplexity on large corpora.
+
+Full details of the perplexity computation can be found in
+Appendix [apdx:perplexity].
+
+Unsurprisingly, larger language models generally attain lower perplexity
+compared to smaller models. Recent work has shown an increased focus on
+the empirical scaling laws of language models . As such, we investigate
+the scaling law for the GPT-2 and GPT-3 families of models on perplexity
+evaluation on the Pile. The scaling law relation for the GPT-3 family of
+models is shown in Figure 1.[10] The line of best fit shown in the
+figure has a coefficient of -0.1674 and an intercept of 2.5516.
+
+[Scaling law for performance of GPT-2/3 models. ‘Zero-shot’ refers to
+the fact that none of the models have been fine-tuned on data from the
+Pile.]
+
+Interestingly, while GPT-2 and GPT-3 were not trained on the Pile, there
+still appears to be a clear scaling law without diminishing returns. We
+hypothesize that this is due to the inherent generalization capability
+of these models. We leave a more rigorous analysis of zero-shot scaling
+laws to future work.
+
+Relative Componentwise GPT-3 Pile Performance
+
+Determining which components GPT-3 underperforms on provides information
+about which Pile components are most dissimilar to the distribution of
+text (web pages and books) that GPT-3 was trained on. These components
+would thus make especially good candidates for supplementing GPT-3
+training data. These results are also valuable for determining which
+types of datasets to emphasize for future iterations of the Pile.
+
+Due to the difference in entropy of different datasets, directly
+comparing perplexity of GPT-3 on different Pile components is not an
+accurate indication of relative performance. Ideally we would train a
+GPT-3 model from scratch on the Pile and compare the difference in loss
+per dataset with that of the original GPT-3. Because of resource
+constraints, we instead use a GPT-2 model trained from scratch on the
+Pile (see ) to construct a proxy measure. To construct our proxy, we
+first measure the improvement from the GPT-2-Pile model to GPT-3 on each
+component. Then, we normalize our results by setting the change on
+OpenWebText2 to be zero. This computation is shown in the equation
+below:
+
+$$\begin{aligned}
+    \Delta_{\mathrm{set}} &= \left(L^{\mathrm{GPT3}}_{\mathrm{set}} - L^{\mathrm{GPT3}}_{\mathrm{owt2}}\right)\\
+    & - \left(L^{\mathrm{GPT2Pile}}_{\mathrm{set}} - L^{\mathrm{GPT2Pile}}_{\mathrm{owt2}}\right)\end{aligned}$$
+
+Since GPT2-Pile was trained on both OWT2 and the dataset we are
+evaluating, we expect the second term in Δ_(set) to reflect the
+difference in the intrinsic difficulty of the two datasets. Thus the
+total value of Δ_(set) reflects how much harder the dataset we are
+evaluating was for GPT-3 than OWT2, minus the relative difficulty of the
+two tasks. As GPT-3 was trained on data very similar to OWT2, this gives
+us a proxy for how much better GPT-3 would do if it were trained on the
+Pile.
+
+The results are shown in Figure [fig:rel_bpb_gpt3]. As a sanity check,
+we observe that datasets that are contained in, or are extremely similar
+to, GPT-3’s training set (Books3, Wikipedia (en), Pile-CC and Project
+Gutenberg) score close to zero on our metric.
+
+[image]
+
+GPT-3 appears to perform poorly on datasets pertaining to research or
+academic writing like PubMed Central, PubMed Abstracts, and ArXiv;
+domain-specific datasets like FreeLaw, HackerNews, and USPTO
+Backgrounds; and on datasets containing predominantly text distinct from
+natural language, like GitHub and DM Mathematics. In addition, the
+majority of datasets see less of an improvement than OpenWebText2. As
+such, we expect a GPT-3 sized model trained on Pile to perform
+significantly better on research related tasks, software tasks, and
+symbol manipulation tasks than the base model. Additionally, this
+experiment provides evidence that the majority of Pile components are
+not redundant with the predominantly web-based GPT-3 training data.
+
+We note that this metric is only a proxy for similarity, and that it
+could be confounded by dataset specific scaling effects. Although our
+results largely accord with expectations, there are some puzzling
+results, like the datasets on which GPT-3 outperformed GPT-2 Pile. We
+hypothesize that GPT-3 learns to be so good at these datasets that
+training on them explicitly does not notably benefit the model’s
+performance. We leave a more rigorous analysis of these effects for
+future work.
+
+Evaluation
+
+  ------------- -------------- ------------ ------------- ---------- --------- --------- --
+                  Dataset Size   Pile (val)   Pile (test)   WikiText   LAMBADA   LAMBADA 
+                                      (BPB)         (BPB)      (PPL)     (PPL)     (ACC) 
+  The Pile             825 GiB       0.9281        0.9433       5.59     12.78      50.1 
+  CC-100 (en)          300 GiB       1.3143        1.3293       8.27     11.78      49.7 
+  Raw CC             45927 GiB       1.1180        1.1275      11.75     19.84      43.8 
+  ------------- -------------- ------------ ------------- ---------- --------- --------- --
+
+[image]
+
+To confirm the effectiveness of the Pile for improving language modeling
+quality, we train architecturally-identical 1.3 billion parameter models
+based on those in on different datasets and evaluate on the WikiText and
+LAMBADA tasks as benchmarks of language modeling ability. We also report
+results on the Pile as a measure of more cross-domain generalization.
+
+Methodology
+
+To ensure a fair comparison across datasets of different sizes, we
+decontaminate any instances of the evaluation sets using the same
+13-gram overlap filtering as in and downsample to 40GB to control for
+dataset size. As we control for dataset size, we emphasize that our
+evaluation is generous to CC-100 (en), which is about 1/3 the size of
+the Pile in reality.
+
+We compare the following datasets: the Pile, the English component of
+the CC-100 dataset[11] , and a sample of raw CC WET files filtered for
+English-only.
+
+Results
+
+On traditional language modeling benchmarks, the Pile improves
+significantly on WikiText and shows negligible changes in LAMBADA.
+However, models trained on Pile improve significantly over both Raw CC
+and CC-100 on all components of the Pile, as shown in Table
+[table:ablation_overview_test]. This indicates that models trained on
+the Pile have greater cross-domain generalization capabilities without
+compromising performance on traditional benchmarks.
+
+The magnitude of improvement over CC-100 per set is shown in Figure
+[fig:pile_improvement_cc100]. Unsurprisingly, there is almost no
+improvement on Pile-CC. However, the model trained on the Pile performs
+significantly better than either of the other models on academic
+datasets such as ArXiv, Pubmed Central, FreeLaw, and PhilPapers. It also
+improves significantly on programming-related datasets like Github and
+StackExchange, on EuroParl, due to the lack of multilingual text in
+either other dataset, and on DM Mathematics, indicating a significant
+improvement in mathematical ability.
+
+Surprisingly, raw Common Crawl performs better on the Pile BPB than
+CC-100, despite losing by a significant margin on LAMBADA and WikiText.
+We hypothesize that this is due to the perplexity based filtering used
+in CC-100, where a language model is trained on Wikipedia and all data
+with a perplexity too high or too low is discarded. This effectively
+discards any data too similar to or too different from Wikipedia, which
+severely limits the diversity of the collected data. This result
+suggests that future work using Common Crawl should take caution with
+filtering to preserve its diversity.
+
+Structural Statistics
+
+In this section, we cover the Structural Statistics of the dataset,
+which provide more coarse-grained and statistical information about the
+Pile. In Section 6, we provide a closer investigation and documentation
+of the textual content within the Pile datasets.
+
+Document Lengths and Tokenization
+
+Each dataset consists of a large number of documents. We analyze the
+distribution of document lengths, as well as the number of
+bytes-per-token using the GPT-2 tokenizer in order to put our ablations
+in context.
+
+[Distribution of document lengths in Pile. The highest 1 percentile of
+document length are considered to be outliers and excluded from this
+plot.]
+
+While the majority of documents in the Pile are short, there is a long
+tail of very long documents (Figure 2).
+
+Since the GPT-2 BPE tokenizer is trained on WebText, the mean bytes per
+token is also a very rough indicator of how syntactically different each
+Pile component is from WebText. For instance, datasets like NIH
+ExPorter, OpenWebText2 and Books3 consist largely of ordinary text in a
+similar distribution to WebText, which is reflected in a greater number
+of bytes per token. On the other hand, many of the sets with the lowest
+bytes per token are those which consist in large part of non-text
+content (Github, ArXiv, Stack Exchange, and DM Mathematics) or languages
+other than English (EuroParl).
+
+[Mean bytes per GPT-2-token for each dataset in the Pile. Error bars
+indicate standard deviation.]
+
+Language and Dialects
+
+While only 13% of the world’s population speaks English, the vast
+majority of NLP research is done on English. For the Pile, we took a
+similar approach to the dataset used by and focused predominantly on
+English, while also not explicitly filtering out other languages when
+collecting our own data. When evaluating a multilingual dataset, our
+main criteria for inclusion was whether the English component of the
+dataset merited inclusion alone. We plan to create a fully multilingual
+expansion of the Pile as future work.
+
+Using fasttext , we determine that the Pile is 97.4% English. We note
+that due to issues with language identification, particularly with rare
+languages , this methodology provides only a rough estimate for English
+content and no reliable conclusions for low-resource languages can be
+drawn.
+
+Investigating and Documenting the Datasets
+
+As the scale of machine learning research has grown, scrutiny has been
+placed on the ever larger datasets that models are trained on
+
+While this issue has been raised within AI ethics and bias research , it
+has not been a focal point of concern within the language modeling
+community. Despite the proliferation of work exploring and documenting
+issues with datasets , no dataset intended to train massive language
+models has been seriously documented by its creators[12]. Therefore, our
+analyses serve two goals: to address ethical concerns about the Pile,
+and to promote and normalize the practice of engaging with the AI ethics
+literature.
+
+Natural language processing technologies are widely applicable and can
+be used in extremely different contexts. What is and is not appropriate
+data to train on can therefore vary wildly with the application context.
+In our view, the best approach is to document rather than eliminate
+potentially concerning aspects of datasets[13], particularly since the
+purpose of the Pile is to train general-purpose language models. The
+primary goal of our documentation, therefore, is to empower NLP
+researchers to make informed decisions.
+
+Documenting Methods
+
+To document the Pile, we chose to implement two frameworks that have
+been proposed by methodologists and ethics researchers. The first, the
+datasheets methodology , is a general purpose methodology that is
+recommended by several methodologists and appears to be used more
+frequently by practitioners than alternatives . The second, the data
+statements methodology , was proposed specifically for natural language
+processing and has been well received by the NLP community. Our
+datasheet and data statement will be featured in the GitHub repository
+where the code for the Pile is stored and will also be available as
+separate documents on arXiv .
+
+In addition to the datasheet and data statement, there is additional
+information that may be helpful to people training language models that
+these documents do not cover. In the rest of this section we investigate
+and document in greater detail some of this additional contextual
+information.
+
+Topical Distribution
+
+In order to better understand the specific subject matter covered by the
+Pile, we performed a topic modeling analysis on its components. Using
+Gensim , we trained 16-topic Latent Dirichlet Allocation models on each
+component of the validation set of the Pile concurrently, in an online
+fashion . We filtered the Pile for English only for this analysis.
+Afterwards, we computed the perplexity of the Common Crawl-derived
+(Pile-CC) topic model on the document sets of the other components. In
+this way, we provide a rough measure of the degree to which parts of the
+Pile contain topics not well covered within Common Crawl.
+
+In Figure [fig:topic_model_perplexities], these cross-component
+perplexities are shown, with a vertical line indicating the perplexity
+of the Pile-CC topic model evaluated on the documents of OpenWebText2.
+This component was chosen as a baseline of comparison for similar
+reasons as in the previous evaluation: it is derived in a similar manner
+(filtered crawls of the open web) as the Common Crawl, and thus is
+expected to contain a similar distribution of topics. Although Pile-CC
+is somewhat diverse in its content, several of the Pile’s other
+components deviate from it strongly in their topical focus, as evidenced
+by higher perplexity on Github, PhilPapers, and EuroParl.
+
+We also documented the topical clusters inferred from our LDA models for
+each component, which we provide in Appendix [apdx:data]. As expected,
+though the larger CC-derived component itself represents a diversity of
+content—including politics, education, sports and entertainment—the
+content clusters it misses become apparent when compared qualitatively
+to other components of the Pile. Notably, the data modes covering
+programming, logic, physics, and legal knowledge appear largely absent.
+
+[image]
+
+Pejorative Content
+
+Due to the wide diversity in origins, it is possible for the Pile to
+contain pejorative, sexually explicit, or otherwise objectionable
+content. As this content may not be desirable for some use cases, we
+break down profanity on a per-dataset level.
+
+We used the profanity-checker Python package . This package includes a
+“toxicity model” trained on multiple profanity lists as well as the
+Wikidetox Toxic Comment Dataset and classifies a given string as being
+profane or not profane.
+
+We considered only the English sentences in each dataset using the same
+language classifier from Section 3.7. We did this since
+profanity-checker is built for English and other languages may
+improperly impact the results. For instance, the German
+nominative/accusative feminine/plural definite article "die" is flagged
+as being profane regardless of context. We split each sentence into
+words and computed the percentage of words that are flagged as profane
+for each component of the Pile. We emphasize that this methodology is
+only a proxy for profanity, given the complexity of determining whether
+a given word or phrase is profane in context.
+
+As shown in Figure 4, the Pile as a whole appears less profane than
+Pile-CC. Further, the majority of Pile components appear less profane
+than Pile-CC as well.
+
+[Percentage of words classified as profane in the Pile. The percentage
+of the CC component and the weighted mean of the Pile as a whole are
+shown as horizontal lines.]
+
+We also broke each dataset down on a sentence level, to allow
+profanity-checker to check entire sentences. Splitting datasets by
+sentence allows for additional context to be considered when determining
+whether content is pejorative. Our results are shown in Figure
+[fig:profane_sent].
+
+Bias and Sentiment Co-occurrence
+
+As language models may pick up unexpected biases from the training data,
+we performed a preliminary analysis of the different components that
+make up the Pile. Because models with different characteristics may be
+trained on the Pile, we aimed to document the biases of the data and not
+a specific model. We primarily focus on co-occurrence tests, where we
+analyzed what words occur in the same sentence as other specific words.
+Using this information, we can estimate what words strongly bias towards
+a category word, as well as calculate the general sentiment of
+surrounding words.
+
+We focused our analysis on gender, religion, and race. Our goal is to
+provide users of this dataset with preliminary guidance on how the
+different components are biased so that they can make decisions on which
+components to train on.
+
+All tables and figures in this section can be found in the Appendix.
+
+Gender
+
+We computed gender associations by computing co-occurrences for binary
+pronouns. For each word, we computed the difference in the rate it
+co-occurs with "he" and "she"[14] and weighed it by the square root of
+its frequency. We report the top 15 most biased adjectives or adverbs 
+for each in Table [table:gender_cooccurrence]. We see that words like
+“military”, “criminal”, and “offensive” strongly bias towards men, while
+“little”, “married”, “sexual”, and “happy” bias towards women.
+
+In addition, we computed the average sentiment  of words co-occurring
+with the gendered pronouns across each dataset in
+Figure [fig:gender_sentiment]. Generally, we find no significant
+sentiment bias towards men or women. This, of course, does not mean that
+the dataset is free of gender bias (as our co-occurrence tests show).
+
+Religion
+
+We computed a similar co-occurrence analysis for religion, which can be
+found in Table [table:religion_cooccurrence]. Like gender, we find that
+these co-occurrences reflect how these terms are used in pockets of
+online discourse. For example, “radical” co-occurs with “muslim” at a
+high rate, while “rational” often co-occurs with “atheist”. This
+analysis also demonstrates some of the limitations of a purely
+co-occurrence based analysis. For example, “religious” often co-occurs
+with “atheist”, which likely reflects the type of conversations in which
+the word “atheist” is likely to occur as opposed to a descriptor of
+“atheist”.
+
+In addition, we computed the average sentiment of co-occurrences across
+each of the constituent datasets in Figure [fig:religion_sentiment].
+Over the entire dataset, we find that “Buddhist” has the highest
+sentiment, followed by “Hindu”, “Christian”, “Atheist”, and “Muslim”.
+Notably, “Jew” is the lowest, perhaps reflecting its historical use as a
+pejorative.
+
+Race
+
+Finally, we ran the same analysis for racial groups. Here, as
+identifiers like “black” or “white” often do not indicate race, we
+instead compute co-occurences with phrases like “black man” or “white
+woman”.
+
+We show the top 15 most biased words for each demographic in Table
+[table:race_cooccurrence]. Once again, we found that the co-occurrences
+reflect the context in which these terms are used. For example, the 4
+most biased words for “black” are “unarmed”, “civil”, “criminal”, and
+“scary”.
+
+Similar to above, we compute the average sentiment of co-occurring
+words. We report the average sentiment numbers in Table
+[table:race_sentiment]. We find that “hispanic/latino” narrowly edges
+out “asian” for the highest sentiment, followed by “white”. On the other
+hand, “black” had the lowest sentiment, at -0.15.
+
+We note that for all demographics, the average sentiment is negative. We
+hypothesize that this is due to the specific context for which the
+phrases we use to compute co-occurrences appear. For example, it is
+often quite common for news articles to describe suspects as an “asian
+man”.
+
+Author Consent and Public Data
+
+Another issue with the use of texts in natural language processing
+research is consent. Although one is typically not legally obligated to
+receive the permission of an author to train a NLP algorithm on their
+work[15], many consider doing so a moral obligation or a good measure to
+guard against misuse . On the other hand, there is significant
+disagreement surrounding the ethics of repurposing data protected by
+terms of service in research contexts , particularly given the power
+asymmetries inherent in digital platforms, which often close off
+independent researchers from investigating public data while
+simultaneously compelling users to consent to its private use .
+
+While much of the Pile’s data comes from sources that have expressly
+consented to its wider dissemination and use in research, researchers
+often fail to clearly document where their data came from and under what
+terms its use was consented to. In light of this, we felt it appropriate
+to release the Pile with transparency around how the authors of its data
+have indicated that that data can be used.
+
+To provide needed nuance to our discussion of consent, we identified
+three tiers of availability for public use. Public data is data which is
+freely and readily available on the internet. This primarily excludes
+data which is pay-walled (regardless of how easy that paywall is to
+bypass) and data which cannot be easily obtained but can be obtained,
+e.g. through a torrent or on the dark web. Terms of Service (ToS)
+compliant data is data which is obtained and used in a fashion that is
+known to be consistent with the terms of service of the data host. Data
+with authorial consent is data for which the original authors of the
+work consented to the use of their data, or where a reasonable person
+could not assume that their data would not be used for purposes such as
+research. ToS compliant data and authorial consented data differ in two
+main ways: It is important to keep in mind that people typically do not
+read Terms of Service, and additionally that being ToS-compliant does
+not entail authorial consent. We adopted a strict model of consent,
+where ambiguous or unknown consent is treated as non-consensual.
+
+summarizes our understanding of the status of each of the datasets
+within the Pile. Datasets marked with a are compliant in the relevant
+respects, though a couple datasets are worth remarking on in particular.
+Book3 and OpenSubtitles are being used in a fashion that is consistent
+with the terms of service of the data host. However, this is somewhat
+misleading in that the data host is not authorized to post the data
+online by the parties that own it. The Enron Emails dataset was not
+collected with the permission of the authors, but was collected by the
+U.S. government as part of a criminal investigation. While the people
+whose emails are in the Enron dataset are aware of this fact, they were
+not given the ability to consent to its inclusion in any way.
+
+There are five datasets included in the Pile that were not collected and
+distributed in a ToS compliant fashion and for which the authors had no
+ability to consent to their data being used. Each of these datasets are
+widely used, both in the NLP literature and the world at large. With the
+exception of the YouTube Subtitles dataset, each of these datasets were
+published by researchers and are passed around freely on the internet.
+The YouTube Subtitles dataset was created by us for this project, using
+a very popular unofficial API that is both widely used and easily
+obtainable on Pip, Conda, and GitHub, among other places. Given the
+processing applied and the difficulty of identifying particular files in
+the Pile, we feel that our use of these datasets does not constitute
+significantly increased harm beyond that which has already been done by
+the widespread publication of these datasets.
+
+  Component         Public   ToS   Author
+  ---------------- -------- ----- --------
+  Pile-CC                         
+  PMC                             
+  Books3                          
+  OWT2                            
+  ArXiv                           
+  Github                          
+  FreeLaw                         
+  Stack Exchange                  
+  USPTO                           
+  PubMed                          
+  PG-19                           
+  OpenSubtitles                   
+  Wikipedia                       
+  DM Math                         
+  Ubuntu IRC                      
+  BookCorpus2                     
+  EuroParl                        
+  HackerNews                      
+  YTSubtitles                     
+  PhilPapers                      
+  NIH                             
+  Enron Emails                    
+
+  : Types of consent for each dataset
+
+Implications and Broader Impacts
+
+The Pile represents yet another stepping stone along the path of scaling
+models and datasets to ever larger sizes and capabilities. There are
+many serious concerns about how the emergence of progressively stronger
+AI systems will influence the wider world , and we believe that they
+merit serious thought. In this section we discuss the legal
+ramifications of the Pile, and then consider the impact of the Pile to
+AI alignment from two angles: accelerating AI timelines and the dangers
+posed by unaligned language models.
+
+Legality of Content
+
+While the machine learning community has begun to discuss the issue of
+the legality of training models on copyright data, there is little
+acknowledgment of the fact that the processing and distribution of data
+owned by others may also be a violation of copyright law. As a step in
+that direction, we discuss the reasons we believe that our use of
+copyright data is in compliance with US copyright law.[16]
+
+Under (and affirmed in subsequent rulings such as ), non-commercial,
+not-for-profit use of copyright media is preemptively fair use.
+Additionally, our use is transformative, in the sense that the original
+form of the data is ineffective for our purposes and our form of the
+data is ineffective for the purposes of the original documents. Although
+we use the full text of copyright works, this is not necessarily
+disqualifying when the full work is necessary . In our case, the
+long-term dependencies in natural language require that the full text be
+used in order to produce the best results .
+
+Copyright law varies by country, and there may be additional
+restrictions on some of these works in particular jurisdictions. To
+enable easier compliance with local laws, the Pile reproduction code is
+available and can be used to exclude certain components of the Pile
+which are inappropriate for the user. Unfortunately, we do not have the
+metadata necessary to determine exactly which texts are copyrighted, and
+so this can only be undertaken at the component level. Thus, this should
+be be taken to be a heuristic rather than a precise determination.
+
+Acceleration of AI Timelines
+
+There is serious concern that AI systems may soon be meaningfully more
+capable than humans in all relevant economic tasks . Relatedly, there
+are serious unresolved questions surrounding how to properly align such
+powerful AI systems with human interests and generally avoid morally
+catastrophic outcomes . As such, it has been argued that accelerating
+the development of such powerful AI systems may be undesirable before
+these concerns have been more adequately addressed .
+
+There are several pragmatic responses to this view:
+
+1.  Due to human competition, curiosity, and cultural diversity, halting
+    technological development is incredibly difficult, if not
+    impossible.
+
+2.  AI development is experimental in nature: The alignment problem can
+    only be solved through development, testing and (hopefully
+    non-existential) failure.
+
+3.  High powered language models, along with their more general
+    successors, must be capable of viewing morally problematic content
+    without adopting it in their output. We elaborate on this in the
+    following section.
+
+With this in mind, we accept the reality that the Pile could potentially
+accelerate AI timelines. However, we hope our efforts to establish best
+practices, such as thoroughly documenting the contents of our data, will
+help encourage diligence for downstream researchers on alignment
+problems.
+
+Negative LM Output
+
+There has been much discussion about the possible negative effects of
+powerful language models in the world . Some of these possible problems,
+such as the ability to mass produce low quality content for the purpose
+of Search Engine Optimization, are inherent problems to the way online
+content is distributed, and cannot be stopped by those developing
+language models alone. Directly solving these problems would require
+sweeping changes to the architecture of the Internet, such as vastly
+expanded Public Key Infrastructure and distributed authentication of
+identity .
+
+Another concern is that training such models on huge datasets will
+almost inevitably require them to have undesirable content in their
+training sets, such as that promoting hateful stereotypes . Having
+models output undesirable content is, by definition, undesirable, but we
+believe that attacking this problem from the training set side is
+unproductive and ultimately leads us away from optimal solutions. If a
+person reads a racist piece of content, they do not then immediately
+adopt its racist views—they may be capable of doing so, but can decide
+not to. This capacity to understand undesirable content and then decide
+to ignore it is an essential future research direction. Not only would
+this allow models to use “dirtier" data with less concern, but also to
+use their gained knowledge to better understand what not to do. We
+recognize that, despite recent progress in human-guided learning , the
+technology is not yet at this stage, and have thus made a number of
+editorial decisions as described in this paper. However, this approach
+seems essential to the future of these models and AI more broadly, and
+more research is needed.
+
+Related Work
+
+Self-supervised training of natural language processing models on large,
+unlabeled text corpora, has seen widespread adoption in the field. Word
+representation models such as GloVe and word2vec were trained on
+datasets such as Wikipedia, Gigaword , or a non-public Google News
+corpus. More recently, language models and masked language models have
+been trained on datasets such as Wikipedia, BookCorpus , RealNews ,
+CC-Stories , and other Internet scrape-derived datasets discussed below.
+Other datasets such as WikiText have also been used in similar
+self-supervised training.
+
+As data requirements for language modeling have grown, the field has
+turned towards Internet scrapes for large-scale datasets , with Common
+Crawl being particularly prevalent. Works such as have relied on Common
+Crawl to build training datasets for large-scale models. However, these
+works often highlight the difficulty of cleaning and filtering the
+Common Crawl data, and often highlight the resulting data quality as a
+determining factor of model capability.
+
+It has also been increasingly common practice to combine multiple
+datasets when training language models. For instance, GPT was trained on
+Wikipedia and BookCorpus, whereas GPT-3 was trained on Wikipedia, two
+fiction datasets, and two web-scraped datasets. The Pile continues the
+trend of combining large-scale web-scrapes with smaller, higher-quality
+datasets that capture knowledge we believe would be most beneficial to
+training language models.
+
+The two most comparable publicly available datasets to the Pile are
+CC-100 and C4/mC4 . C4 is comparably-sized to the Pile, while mC4 and
+CC-100 are larger, multilingual datasets. However, C4/mC4 require
+immense computational resources to preprocess the data, with its
+maintainers even recommending the use of a distributed cloud
+service,[17] setting a high bar of entry to using these datasets. CC-100
+is directly downloadable and pre-cleaned; however, its English portion
+is much smaller than the Pile. Importantly, these three datasets are all
+derived entirely from Common Crawl—as discussed above, the current best
+practice in training large-scale language models involve using both
+large web scrapes and more targeted, higher-quality datasets, which the
+Pile directly addresses.
+
+Acknowledgments
+
+The authors would like to thank TensorFlow Research Cloud for providing
+the computational resources for the evaluation and OpenAI for providing
+access and credits for the OpenAI API for GPT-3 evaluation.
+
+We would also like to thank Farrukh Raman, JR Smith, and Michelle
+Schmitz for reviewing the manuscript.
+
+[1] https://pile.eleuther.ai/
+
+[2] https://github.com/EleutherAI/the-pile
+
+[3] https://www.courtlistener.com/
+
+[4] https://archive.org/details/stackexchange
+
+[5] https://bulkdata.uspto.gov/
+
+[6] https://irclogs.ubuntu.com/
+
+[7] https://philpapers.org/
+
+[8] https://exporter.nih.gov/
+
+[9] https://news.ycombinator.com
+
+[10] While the sizes of GPT-3 models on the OpenAI API have not been
+publicized, we assume here that ada, babbage, curie and davinci models
+correspond to 2.7B, 6.7B, 13B and 175B parameter models respectively.
+
+[11] The data was obtained from http://data.statmt.org/cc-100/.
+
+[12]  discusses ethical issues surrounding their model, but do not
+discuss those surrounding the training dataset itself.
+
+[13] That said, we did exclude several datasets, see Appendix
+[apdx:excluded] for details.
+
+[14] We chose to only study male and female pronouns as a simplifying
+assumption. Studying “they” would require us to isolate its usage as a
+singular noun.
+
+[15] Laws vary by country. For a discussion of US law, see
+
+[16] This discussion does not, and is not intended to, constitute legal
+advice; rather, it is a general discussion of law. Only your attorney
+can provide assurances that the information contained herein is
+applicable or appropriate to a particular situation. If in doubt, it is
+always advisable to speak to an intellectual property attorney.
+
+[17] https://www.tensorflow.org/datasets/catalog/c4
