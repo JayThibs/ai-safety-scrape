@@ -61,7 +61,7 @@ def preextract_tar(dump):
 def copy_tar(dump):
     """Copies tar files from tmp2/{dump_name}/* to tmp/."""
     dump_name = dump.split("/")[-1][:-4]
-    print(dump_name)
+    # print(dump_name)
     for i in range(120):
         if os.path.exists(f"tmp2/done_{dump_name}"):
             sh(f"mv tmp2/{dump_name}/* tmp")
@@ -114,8 +114,33 @@ def convert_semiauto(rootdir="tmp", paper_id=None):
         else:
             for doc in ls("."):
                 doc = doc.split("/")[-1][:-4]
-                print(doc)
-                if doc in ["main", "Main", "MAIN", "paper", "Paper"]:
+                # print(doc)
+                if doc in [
+                    "main",
+                    "Main",
+                    "MAIN",
+                    "_main",
+                    "paper",
+                    "Paper",
+                    "PAPER",
+                    "ms",
+                    "arxiv",
+                    "arXiv",
+                    "example_paper",
+                    "root",
+                    "example",
+                    "00_main",
+                    "00_Main",
+                    "00-Main",
+                    "00-main",
+                    "main_arxiv",
+                    "main_arXiv",
+                    "main-arxiv",
+                    "main-arXiv",
+                    "Main-arXiv",
+                    "master",
+                    "Master",
+                ]:
                     # if there is a common main file name, use it
                     main_match = True
                     sh(f"timeout 7s pandoc -s {doc}.tex -o {paper_id}.md --wrap=none")
@@ -123,7 +148,15 @@ def convert_semiauto(rootdir="tmp", paper_id=None):
         if not main_match:
             # if there are multiple tex files and it's not in the above list: prompt user to select one
             print("Multiple tex files found. Please select the main file: ")
+            tmp_contents = os.listdir()
             print(os.listdir())
+            for doc in tmp_contents:
+                if doc.endswith(".tex"):
+                    num_tex_files += 1
+                    tex_doc = doc
+            if num_tex_files == 1:
+                # if there is only one tex file, use it
+                sh(f"timeout 7s pandoc -s {tex_doc} -o {paper_id}.md --wrap=none")
             if paper_id in main_tex_dict:
                 main_tex = main_tex_dict[paper_id]
             else:
@@ -176,12 +209,12 @@ for i, dump in enumerate(tqdm(files)):
             # if tmp2/done_{dump_name} is not created, skip this dump
             continue
         # extract
-        print(dump)
+        # print(dump)
         sh(f"tar xf {dump} -C tmp")
         # replace special characters in file names with underscores
         os.chdir("tmp")
         for doc in os.listdir():
-            print(doc)
+            # print(doc)
             if os.path.isdir(doc):
                 new_doc_name = doc.translate(
                     {ord(c): "_" for c in " !@#$%^&*()[]{};:,<>?\|`~-=+"}
@@ -191,7 +224,7 @@ for i, dump in enumerate(tqdm(files)):
         os.chdir("..")
         # this loop deletes all files in tmp that are not .tex files
         for doc in lsr("tmp"):
-            print(doc)
+            # print(doc)
             try:
                 if doc.endswith(".gz"):
                     sh(f"gunzip {doc}")
