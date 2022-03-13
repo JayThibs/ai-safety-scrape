@@ -1,4 +1,5 @@
 import os
+import re
 from utils import *
 import magic
 
@@ -87,7 +88,7 @@ def mv_files_to_root(rootdir="tmp"):
             )
 
 
-def convert_semiauto(rootdir="tmp", paper_id=None, main_tex_dict=main_tex_dict):
+def convert_semiauto(rootdir="tmp", paper_id=paper_id, main_tex_dict=main_tex_dict):
     """
     Converts paper tex files semi-automatically. If there are multiple tex files,
     it will check for a list of common "main" file names and use the first one found.
@@ -193,7 +194,7 @@ def convert_semiauto(rootdir="tmp", paper_id=None, main_tex_dict=main_tex_dict):
 def get_arxiv_ids(bib_file_path):
     with open(bib_file_path, "r") as f:
         bib_string = f.read()
-    return re.findall(r"(?:arXiv:|abs/)(\d{4}\.\d{4,5})", bib_string)
+    return re.findall(r"(?:arXiv:|abs/)(\d{4}\.\d{4,5})", bib_string), bib_string
 
 
 files = ls("files")
@@ -249,6 +250,9 @@ for i, dump in enumerate(tqdm(files)):
                     elif type == "text/x-tex":
                         # if tex, keep it
                         sh(f"mv {doc[:-3]} {doc[:-3]}.tex")
+                    elif type == "application/x-bbl":
+                        # if bbl, keep it
+                        sh(f"mv {doc[:-3]} {doc[:-3]}.bbl")
                     else:
                         # if not tar or tex, delete file
                         sh(f"rm {doc[:-3]}")
@@ -276,7 +280,7 @@ for i, dump in enumerate(tqdm(files)):
         print("Moving files to root folder...")
         mv_files_to_root()
         print("Converting paper...")
-        convert_semiauto(paper_id=paper_id)
+        convert_semiauto("tmp", paper_id, main_tex_dict)
 
         sh(f"mv {dump} done")
         print(f"marking {dump} as done")
