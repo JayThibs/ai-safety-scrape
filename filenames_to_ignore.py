@@ -57,6 +57,8 @@ ignore_list_title = [
     "Abbrev",
     "Plots",
     "Datasheet",
+    "References",
+    "Supp",
 ]
 
 
@@ -65,6 +67,7 @@ def modify_caps(ignore_list_title):
     ignore_list_cap = []
     for item in ignore_list_title:
         ignore_list_lower.append(item.lower())
+        ignore_list_cap.append(item.upper())
     ignore_list = ignore_list_title + ignore_list_lower + ignore_list_cap
     return ignore_list
 
