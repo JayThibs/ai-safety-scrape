@@ -147,6 +147,7 @@ def convert_semiauto(rootdir="tmp", paper_id=paper_id, main_tex_dict=main_tex_di
             # if there are multiple tex files and it's not in the above list: prompt user to select one
             print("Multiple tex files found. Please select the main file: ")
             tmp_contents = os.listdir()
+            num_tex_files = 0
             print(os.listdir())
             for doc in tmp_contents:
                 if doc.endswith(".tex"):
