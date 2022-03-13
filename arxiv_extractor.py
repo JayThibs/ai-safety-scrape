@@ -8,6 +8,7 @@ import chardet
 import time
 from tqdm import tqdm
 import json
+import pandas as pd
 import traceback
 
 
@@ -86,7 +87,7 @@ def mv_files_to_root(rootdir="tmp"):
             )
 
 
-def convert_semiauto(rootdir="tmp", paper_id=None):
+def convert_semiauto(rootdir="tmp", paper_id=None, main_tex_dict=main_tex_dict):
     """
     Converts paper tex files semi-automatically. If there are multiple tex files,
     it will check for a list of common "main" file names and use the first one found.
@@ -94,10 +95,6 @@ def convert_semiauto(rootdir="tmp", paper_id=None):
     to select one.
     """
     print('Changing current directory to "tmp"...')
-    if os.path.exists("main_tex_dict.json"):
-        main_tex_dict = json.load(open("main_tex_dict.json"))
-    else:
-        main_tex_dict = {}
     os.chdir(rootdir)
     main_match = False
     print("Current directory: " + os.getcwd())
@@ -193,13 +190,27 @@ def convert_semiauto(rootdir="tmp", paper_id=None):
         assert os.path.exists(f"out/{paper_id}.md")  # to send tar to errored pile
 
 
+def get_arxiv_ids(bib_file_path):
+    with open(bib_file_path, "r") as f:
+        bib_string = f.read()
+    return re.findall(r"(?:arXiv:|abs/)(\d{4}\.\d{4,5})", bib_string)
+
+
 files = ls("files")
+ignore_filenames = pd.read_csv("ignore_filenames.csv").values
+arxiv_citations_list = []
+
+if os.path.exists("main_tex_dict.json"):
+    main_tex_dict = json.load(open("main_tex_dict.json"))
+else:
+    main_tex_dict = {}
 
 sh("rm -rf tmp/* tmp2/*")
 preextract_tar(files[0])
 
 for i, dump in enumerate(tqdm(files)):
     # extracts tar files to tmp2/{dump_name}/*
+    paper_id = dump.split("/")[-1][:-4]
     if i + 1 < len(files):
         preextract_tar(files[i + 1])
     try:
@@ -246,6 +257,13 @@ for i, dump in enumerate(tqdm(files)):
                     # if tex, keep it
                     sh(f"mv {doc} {doc}")
 
+                elif doc.endswith(".bbl"):
+                    # if bbl, extract arxiv ids from citations, add to list, and delete bbl
+                    arxiv_citations, bbl = get_arxiv_ids(doc)
+                    arxiv_citations_list.extend(arxiv_citations)
+                    main_tex_dict[paper_id]["bibliography"] = bbl
+                    sh(f"rm {doc}")
+
                 else:
                     # if not .tex, delete file
                     sh(f"rm {doc}")
@@ -254,7 +272,6 @@ for i, dump in enumerate(tqdm(files)):
                 print(f"Error deleting file: {doc}")
 
         # process tex files
-        paper_id = dump.split("/")[-1][:-4]
         print("Processing paper_id:", paper_id)
         print("Moving files to root folder...")
         mv_files_to_root()
