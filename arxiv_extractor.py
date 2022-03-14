@@ -1,12 +1,10 @@
 import os
-import re
 from utils import *
+from extractor_functions import *
 import magic
 
 mime = magic.Magic(mime=True)
 import multiprocessing as mp
-import chardet
-import time
 from tqdm import tqdm
 import json
 import pandas as pd
