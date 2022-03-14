@@ -110,6 +110,8 @@ def convert_semiauto(rootdir="tmp", paper_id=paper_id, main_tex_dict=main_tex_di
             doc = ls(".")[0].split("/")[-1]
             sh(f"timeout 7s pandoc -s {doc} -o {paper_id}.md --wrap=none")
         else:
+            # if there are multiple tex files,
+            # check for the main file based on a common list of names
             for doc in ls("."):
                 doc = doc.split("/")[-1][:-4]
                 # print(doc)
@@ -144,8 +146,6 @@ def convert_semiauto(rootdir="tmp", paper_id=paper_id, main_tex_dict=main_tex_di
                     sh(f"timeout 7s pandoc -s {doc}.tex -o {paper_id}.md --wrap=none")
                     break
         if not main_match:
-            # if there are multiple tex files and it's not in the above list: prompt user to select one
-            print("Multiple tex files found. Please select the main file: ")
             tmp_contents = os.listdir()
             num_tex_files = 0
             print(os.listdir())
@@ -158,8 +158,12 @@ def convert_semiauto(rootdir="tmp", paper_id=paper_id, main_tex_dict=main_tex_di
                 sh(f"timeout 7s pandoc -s {tex_doc} -o {paper_id}.md --wrap=none")
             else:
                 if paper_id in main_tex_dict:
+                    # if main file was stored in main_tex_dict, use it
                     main_tex = main_tex_dict[paper_id]
                 else:
+                    # if there are multiple tex files
+                    # and it's not in the above list: prompt user to select one
+                    print("Multiple tex files found. Please select the main file: ")
                     main_tex = str(
                         input(
                             f"Enter the main .tex filename here, file extension included (e.g. AIProgress.tex): "
