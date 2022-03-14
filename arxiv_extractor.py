@@ -156,20 +156,21 @@ def convert_semiauto(rootdir="tmp", paper_id=paper_id, main_tex_dict=main_tex_di
             if num_tex_files == 1:
                 # if there is only one tex file, use it
                 sh(f"timeout 7s pandoc -s {tex_doc} -o {paper_id}.md --wrap=none")
-            if paper_id in main_tex_dict:
-                main_tex = main_tex_dict[paper_id]
             else:
-                main_tex = str(
-                    input(
-                        f"Enter the filename here, file extension included (e.g. AIProgress.tex): "
+                if paper_id in main_tex_dict:
+                    main_tex = main_tex_dict[paper_id]
+                else:
+                    main_tex = str(
+                        input(
+                            f"Enter the main .tex filename here, file extension included (e.g. AIProgress.tex): "
+                        )
                     )
-                )
-                main_tex_dict[paper_id] = main_tex
-                os.chdir("..")
-                json.dump(main_tex_dict, open("main_tex_dict.json", "w"))
-                os.chdir(rootdir)
+                    main_tex_dict[paper_id] = main_tex
+                    os.chdir("..")
+                    json.dump(main_tex_dict, open("main_tex_dict.json", "w"))
+                    os.chdir(rootdir)
 
-            sh(f"timeout 7s pandoc -s {main_tex} -o {paper_id}.md --wrap=none")
+                sh(f"timeout 7s pandoc -s {main_tex} -o {paper_id}.md --wrap=none")
 
         os.chdir("..")
         print("Current directory: " + os.getcwd())
