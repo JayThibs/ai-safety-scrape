@@ -34,6 +34,8 @@ main_tex_name_list = [
     "Master",
 ]
 
+main_tex_name_list = [f"{item}.tex" for item in main_tex_name_list]
+
 
 def any_to_utf8(b):
     """Detects encoding and converts to utf-8."""
@@ -139,31 +141,41 @@ def convert_tex(paper_dir, output_type="md", output_dir="out"):
         else:
             # if there are multiple tex files,
             # check for the main file based on a common list of names
-            for doc in ls("."):
-                doc = doc.split("/")[-1][:-4]
+            for doc in lsr("."):
+                path_to_doc = doc.split("/")[:-1]
+                doc = doc.split("/")[-1]
                 # print(doc)
                 if doc in main_tex_name_list:
                     # if there is a common main file name, use it
-                    main_match = True
-                    sh(f"timeout 7s pandoc -s {doc}.tex -o {paper_id}.md --wrap=none")
-                    os.chdir("..")
-                    os.chdir("..")
-                    sh(f"mv {paper_dir}/{paper_id}.md {output_dir}/{paper_id}.md")
-                    return
-        if not main_match:
-            if paper_id in main_tex_dict:
-                # if main file was stored in main_tex_dict, use it
-                main_tex = main_tex_dict[paper_id]
-            else:
-                # can't find main file, so send to fallback_needed
-                print(
-                    f"{paper_id} not found in main_tex_dict, sending to fallback_needed"
-                )
-                os.chdir("..")
-                sh(f"mv {paper_dir} fallback_needed")
-                return
+                    if len(path_to_doc) == 0:
+                        sh(f"timeout 7s pandoc -s {doc} -o {paper_id}.md --wrap=none")
+                        os.chdir("..")
+                        os.chdir("..")
+                        sh(f"mv {paper_dir}/{paper_id}.md {output_dir}/{paper_id}.md")
+                        return
+                    else:
+                        # there's a common file name, but it's in a subdirectory
+                        # change to that directory and use the common file name
+                        os.chdir(path_to_doc)
+                        sh(f"timeout 7s pandoc -s {doc} -o {paper_id}.md --wrap=none")
+                        for i in range(len(path_to_doc) + 2):
+                            os.chdir("..")
+                        sh(
+                            f"mv {paper_dir}/{path_to_doc}/{paper_id}.md {output_dir}/{paper_id}.md"
+                        )
+                        return
 
-            sh(f"timeout 7s pandoc -s {main_tex} -o {paper_id}.md --wrap=none")
+        if paper_id in main_tex_dict:
+            # if main file was stored in main_tex_dict, use it
+            main_tex = main_tex_dict[paper_id]
+        else:
+            # can't find main file, so send to fallback_needed
+            print(f"{paper_id} not found in main_tex_dict, sending to fallback_needed")
+            os.chdir("..")
+            sh(f"mv {paper_dir} fallback_needed")
+            return
+
+        sh(f"timeout 7s pandoc -s {main_tex} -o {paper_id}.md --wrap=none")
 
         os.chdir("..")
         print("Current directory: " + os.getcwd())
