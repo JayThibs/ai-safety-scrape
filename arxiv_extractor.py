@@ -21,6 +21,11 @@ if os.path.exists("main_tex_dict.json"):
 else:
     main_tex_dict = {}
 
+if os.path.exists("arxiv_citations_dict.json"):
+    arxiv_citations_dict = json.load(open("arxiv_citations_dict.json"))
+else:
+    arxiv_citations_dict = {}
+
 pool = mp.Pool(processes=mp.cpu_count())
 
 
@@ -45,9 +50,9 @@ def fix_chars_in_dirs(paper_dir_path):
                 os.rename(doc, new_doc_name)
 
 
-def prepare_extracted_tars():
+def prepare_extracted_tars(paper_dir_path):
     # extracts tar files to tmp/{dump_name}/*
-    paper_id = tar_filepath.split("/")[-1][:-4]
+    paper_id = paper_dir_path.split("/")[-1][:-4]
     # this loop deletes all files in tmp that are not .tex files
     try:
         for doc in lsr("tmp"):
@@ -79,17 +84,26 @@ def prepare_extracted_tars():
                 elif doc.endswith(".bbl"):
                     # if bbl, extract arxiv ids from citations, add to list, and delete bbl
                     arxiv_citations, bbl = get_arxiv_ids(doc)
-                    arxiv_citations_list.extend(arxiv_citations)
-                    main_tex_dict[paper_id]["bibliography"] = bbl
+                    # load arxiv_citations_dict json and overwrite with new citations
                     chdir_up_n(2)
-                    with open(main_tex_dict, "wb") as f:
-                        json.dump(main_tex_dict, f)
+                    arxiv_citations_dict = json.load(open("arxiv_citations_dict.json"))
+                    for arxiv_id in arxiv_citations:
+                        if arxiv_citations_dict.get(arxiv_id) is None:
+                            arxiv_citations_dict[arxiv_id] = [paper_id]
+                        else:
+                            arxiv_citations_dict[arxiv_id].append(paper_id)
+                    json.dump(
+                        arxiv_citations_dict, open("arxiv_citations_dict.json", "w")
+                    )
+                    main_tex_dict[paper_id]["bibliography"] = bbl
+                    json.dump(main_tex_dict, open("main_tex_dict.json", "w"))
                     os.chdir("tmp/" + paper_id)
                     sh(f"rm {doc}")
 
                 else:
-                    # if not .tex, delete file
-                    sh(f"rm {doc}")
+                    pass
+                    # if not .tex or .bbl, just delete file
+                    # sh(f"rm {doc}")
             except ExitCodeError:
                 traceback.print_exc()
                 print(f"Error deleting file: {doc}")
@@ -111,6 +125,14 @@ if __name__ == "__main__":
     for i, paper_dir in enumerate(os.listdir("tmp")):
         print(f"{i}/{len(os.listdir('tmp'))}")
         p = mp.Process(target=fix_chars_in_dirs, args=("tmp/" + paper_dir,))
+        jobs.append(p)
+        p.start()
+        p.join()
+
+    jobs = []
+    for i, paper_dir in enumerate(os.listdir("tmp")):
+        print(f"{i}/{len(os.listdir('tmp'))}")
+        p = mp.Process(target=prepare_extracted_tars, args=("tmp/" + paper_dir,))
         jobs.append(p)
         p.start()
         p.join()
