@@ -81,18 +81,18 @@ def preextract_tar(tar_filepath, input_dir="files", output_dir="tmp"):
     )
 
 
-def copy_tar(dump):
-    """Copies tar files from tmp2/{dump_name}/* to tmp/."""
-    dump_name = dump.split("/")[-1][:-4]
-    # print(dump_name)
-    for i in range(120):
-        if os.path.exists(f"tmp2/done_{dump_name}"):
-            sh(f"mv tmp2/{dump_name}/* tmp")
-            return True
-        print("waiting for tar...")
-        time.sleep(1)
+# def copy_tar(tar_filepath, input_dir="files", output_dir="tmp"):
+#     """Copies tar files from tmp2/{dump_name}/* to tmp/."""
+#     tar_name = tar_filepath.split("/")[-1][:-4]
+#     # print(dump_name)
+#     for i in range(120):
+#         if os.path.exists(f"tmp2/done_{tar_name}"):
+#             sh(f"mv tmp2/{tar_name}/* tmp")
+#             return True
+#         print("waiting for tar...")
+#         time.sleep(1)
 
-    return False
+#     return False
 
 
 def mv_files_to_root(rootdir="tmp"):
