@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 import json
 import chardet
 from utils import *
@@ -185,14 +186,19 @@ def convert_tex(paper_dir, output_type="md", output_dir="out", main_tex_dict={})
                 sh(f"mv {paper_dir} fallback_needed")
                 return
 
-    except:
+    except ExitCodeError:
         traceback.print_exc()
         print("Error converting paper. Moving to fallback pile...")
         os.chdir(project_dir)
+        # with open(f"fallback_needed/{paper_id}_error.txt", "w") as f:
+        #     traceback.print_exc(file=f)
+        #     exc_info = sys.exc_info()
+        #     exc_info = str(exc_info)
+        #     f.write(f"{paper_id} error: {exc_info}")
         print(f"Error: Current directory: {os.getcwd()}")
         # fallback:
         # move to fallback pile so we can handle it later
-        sh(f"rm -rf fallback_needed/{paper_id}")
+        # sh(f"rm -rf fallback_needed/{paper_id}")
         sh(f"mv -f {paper_dir} fallback_needed")
 
 

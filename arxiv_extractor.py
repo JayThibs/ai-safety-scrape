@@ -9,6 +9,7 @@ from tqdm import tqdm
 import json
 import pandas as pd
 import traceback
+import logging
 
 
 # HOW TO USE FOR TESTING:
@@ -16,10 +17,15 @@ import traceback
 # 2. run script
 
 
+# # log everything to a file
+# logging.basicConfig(filename="log.txt", level=logging.DEBUG)
+# sys.stdout = open("out.log", "w")
+# sys.stderr = sys.stdout
+
 sh(
     "mkdir -p tmp out done fallback_needed errored && rm -rf tmp/* && rm -rf fallback_needed/*"
 )
-files = ls("tmp2")
+files = ls("files")
 ignore_filenames = pd.read_csv("ignore_filenames.csv").values
 arxiv_citations_list = []
 
@@ -125,7 +131,7 @@ def main_convert(paper_dir_path):
 
 if __name__ == "__main__":
 
-    paper_tars = ls("tmp2")
+    paper_tars = ls("files")
     pool.map(preextract_tar, paper_tars)
     paper_folders = ls("tmp")
     pool.close()
@@ -138,6 +144,11 @@ if __name__ == "__main__":
             convert_tex(paper_folder, main_tex_dict)
         except ExitCodeError:
             traceback.print_exc()
+            # create log file for traceback failed paper
+            # with open(
+            #     f"fallback_needed/{paper_folder.split('/')[-1]}_error.txt", "w"
+            # ) as f:
+            #     traceback.print_exc(file=f)
             print(f"Error converting {paper_folder}")
             sh(f"mv {paper_folder} fallback_needed")
 
