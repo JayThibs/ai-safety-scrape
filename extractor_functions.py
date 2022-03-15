@@ -70,14 +70,14 @@ def convert_to_utf8(rootdir="."):
                 print("Error converting files to utf-8.")
 
 
-def preextract_tar(dump):
+def preextract_tar(tar_filepath, input_dir="files", output_dir="tmp"):
     """
-    Creates tmp2/{dump_name} directory and extracts tar files and copies them to tmp2/dump_name/*.
-    Creates tmp2/done_{dump_name} file to signal copy_tar that extraction is done.
+    Creates tmp/{tar_name} directory and extracts tar files and copies them to tmp/tar_name/*.
+    Creates tmp/done_{tar_name} file to signal copy_tar that extraction is done.
     """
-    dump_name = dump.split("/")[-1][:-4]
+    tar_name = tar_filepath.split("/")[-1][:-4]
     sh(
-        f"(mkdir -p tmp2/{dump_name}; tar xf {dump} -C tmp2/{dump_name} && touch tmp2/done_{dump_name}; echo finished preload of {dump_name}) &"
+        f"(mkdir -p {output_dir}/{tar_name}; tar xf {tar_filepath} -C {output_dir}/{tar_name} && touch {input_dir}/done_{tar_name}; echo finished preload of {tar_name}) &"
     )
 
 
@@ -140,59 +140,68 @@ def convert_tex(paper_dir, output_type="md", output_dir="out"):
         else:
             # if there are multiple tex files,
             # check for the main file based on a common list of names
-            for doc in lsr("."):
-                path_to_doc = doc.split("/")[1:-1]  # subdirectory path
+            matched = False
+            for doc in ls("."):
+                # let's check root of directory first
                 doc = doc.split("/")[-1]
                 # print(doc)
                 if doc in main_tex_name_list:
                     # if there is a common main file name, use it
-                    if len(path_to_doc) == 0:
-                        sh(f"timeout 7s pandoc -s {doc} -o {paper_id}.md --wrap=none")
-                        # go back to root
-                        os.chdir("..")
-                        os.chdir("..")
-                        sh(f"mv {paper_dir}/{paper_id}.md {output_dir}/{paper_id}.md")
-                        return
-                    else:
-                        # there's a common file name, but it's in a subdirectory
+                    sh(f"timeout 7s pandoc -s {doc} -o {paper_id}.md --wrap=none")
+                    # go back to root
+                    os.chdir("..")
+                    os.chdir("..")
+                    sh(f"mv {paper_dir}/{paper_id}.md {output_dir}/{paper_id}.md")
+                    matched = True
+                    break
+
+            if not matched:
+                for doc in lsr("."):
+                    # if there is no common main file name in root, check subdirectories
+                    path_to_doc = doc.split("/")[1:-1]  # subdirectory path
+                    doc = doc.split("/")[-1]
+                    # print(doc)
+                    if doc in main_tex_name_list:
                         # change to that directory and use the common file name
                         os.chdir(path_to_doc)
                         sh(f"timeout 7s pandoc -s {doc} -o {paper_id}.md --wrap=none")
                         # go back to root
-                        for i in range(len(path_to_doc) + 2):
-                            os.chdir("..")
+                        chdir_up_n(len(path_to_doc) + 2)
+                        print(f"Current directory: {os.getcwd()}")
                         path_to_doc = "/".join(path_to_doc)
                         sh(
                             f"mv {paper_dir}/{path_to_doc}/{paper_id}.md {output_dir}/{paper_id}.md"
                         )
-                        return
+                        break
 
         if paper_id in main_tex_dict:
             # if main file was stored in main_tex_dict, use it
+            # main_tex_dict is created when we need to use convert_tex_semiauto and manually inputting main tex filename
             main_tex = main_tex_dict[paper_id]
+            sh(f"timeout 7s pandoc -s {main_tex} -o {paper_id}.md --wrap=none")
+            chdir_up_n(2)
+            sh(f"mv tmp/{paper_id}.md out/{paper_id}.md")
         else:
-            # can't find main file, so send to fallback_needed
+            # can't find main file, so send to fallback_needed for manual conversion with convert_tex_semiauto
+            # it's useful to do it this way because then you can go through the fallback_needed folder and
+            # manually convert the files in a batch
             print(f"{paper_id} not found in main_tex_dict, sending to fallback_needed")
-            os.chdir("..")
+            chdir_up_n(2)
             sh(f"mv {paper_dir} fallback_needed")
             return
-
-        sh(f"timeout 7s pandoc -s {main_tex} -o {paper_id}.md --wrap=none")
-
-        os.chdir("..")
-        print("Current directory: " + os.getcwd())
-        sh(f"mv tmp/{paper_id}.md out/{paper_id}.md")
 
     except:
         traceback.print_exc()
         print("Error converting paper. Moving to fallback pile...")
         if os.getcwd().split("/")[-1] == "tmp":
             os.chdir("..")
+        elif os.getcwd().split("/")[-1] == paper_dir:
+            chdir_up_n(2)
         # fallback:
         try:
             # move to fallback pile so we can handle it later
             sh(
-                f"mkdir -p fallback_needed/{paper_id} && mv tmp/* fallback_needed/{paper_id}/"
+                f"mkdir -p fallback_needed/{paper_id} && mv {paper_dir} fallback_needed/{paper_id}/"
             )
         except ExitCodeError:
             traceback.print_exc()
@@ -200,7 +209,7 @@ def convert_tex(paper_dir, output_type="md", output_dir="out"):
         assert os.path.exists(f"out/{paper_id}.md")  # to send tar to errored pile
 
 
-def convert_tex_semiauto(rootdir="tmp", paper_id=paper_id, main_tex_dict=main_tex_dict):
+def convert_tex_semiauto(rootdir="tmp", paper_id=None, main_tex_dict=None):
     """
     Converts paper tex files semi-automatically. If there are multiple tex files,
     it will check for a list of common "main" file names and use the first one found.
