@@ -23,15 +23,6 @@ else:
 
 pool = mp.Pool(processes=mp.cpu_count())
 
-if __name__ == "__main__":
-    jobs = []
-    for i in range(len(files)):
-        print(f"{i}/{len(files)}")
-        p = mp.Process(target=preextract_tar, args=(files[i], "tmp2", "tmp"))
-        jobs.append(p)
-        p.start()
-        p.join()
-
 
 def main_convert():
     for i in range(len(files)):
@@ -54,14 +45,11 @@ def fix_chars_in_dirs(paper_dir_path):
                 os.rename(doc, new_doc_name)
 
 
-for paper_dir in os.listdir("tmp"):
-    fix_chars_in_dirs("tmp/" + paper_dir)
-
-for i, tar_filepath in enumerate(tqdm(files)):
+def prepare_extracted_tars():
     # extracts tar files to tmp/{dump_name}/*
     paper_id = tar_filepath.split("/")[-1][:-4]
+    # this loop deletes all files in tmp that are not .tex files
     try:
-        # this loop deletes all files in tmp that are not .tex files
         for doc in lsr("tmp"):
             # print(doc)
             try:
@@ -76,10 +64,10 @@ for i, tar_filepath in enumerate(tqdm(files)):
                         sh(f"rm {doc[:-3]}")
                     elif type == "text/x-tex":
                         # if tex, keep it
-                        sh(f"mv {doc[:-3]} {doc[:-3]}.tex")
+                        pass
                     elif type == "application/x-bbl":
                         # if bbl, keep it
-                        sh(f"mv {doc[:-3]} {doc[:-3]}.bbl")
+                        pass
                     else:
                         # if not tar or tex, delete file
                         sh(f"rm {doc[:-3]}")
@@ -93,6 +81,10 @@ for i, tar_filepath in enumerate(tqdm(files)):
                     arxiv_citations, bbl = get_arxiv_ids(doc)
                     arxiv_citations_list.extend(arxiv_citations)
                     main_tex_dict[paper_id]["bibliography"] = bbl
+                    chdir_up_n(2)
+                    with open(main_tex_dict, "wb") as f:
+                        json.dump(main_tex_dict, f)
+                    os.chdir("tmp/" + paper_id)
                     sh(f"rm {doc}")
 
                 else:
@@ -101,7 +93,40 @@ for i, tar_filepath in enumerate(tqdm(files)):
             except ExitCodeError:
                 traceback.print_exc()
                 print(f"Error deleting file: {doc}")
+    except Exception:
+        traceback.print_exc()
+        print(f"Error deleting files in {paper_id}")
 
+
+if __name__ == "__main__":
+    jobs = []
+    for i in range(len(files)):
+        print(f"{i}/{len(files)}")
+        p = mp.Process(target=preextract_tar, args=(files[i], "tmp2", "tmp"))
+        jobs.append(p)
+        p.start()
+        p.join()
+
+    jobs = []
+    for i, paper_dir in enumerate(os.listdir("tmp")):
+        print(f"{i}/{len(os.listdir('tmp'))}")
+        p = mp.Process(target=fix_chars_in_dirs, args=("tmp/" + paper_dir,))
+        jobs.append(p)
+        p.start()
+        p.join()
+
+    jobs = []
+    for i, paper_dir in enumerate(os.listdir("tmp")):
+        print(f"{i}/{len(os.listdir('tmp'))}")
+        p = mp.Process(target=main_convert)
+        jobs.append(p)
+        p.start()
+        p.join()
+
+
+for i, tar_filepath in enumerate(tqdm(files)):
+    print(f"{i}/{len(files)}")
+    try:
         # process tex files
         print("Processing paper_id:", paper_id)
         print("Moving files to root folder...")
