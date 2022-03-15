@@ -11,6 +11,11 @@ import pandas as pd
 import traceback
 
 
+# HOW TO USE FOR TESTING:
+# 1. Put a dozen tars in tmp2/
+# 2. run script
+
+
 sh("mkdir -p tmp out done fallback_needed errored && rm -rf tmp/*")
 files = ls("tmp2")
 ignore_filenames = pd.read_csv("ignore_filenames.csv").values
@@ -25,23 +30,17 @@ if os.path.exists("arxiv_citations_dict.json"):
     arxiv_citations_dict = json.load(open("arxiv_citations_dict.json"))
 else:
     arxiv_citations_dict = {}
+    json.dump(arxiv_citations_dict, open("arxiv_citations_dict.json", "w"))
 
 pool = mp.Pool(processes=mp.cpu_count())
-
-
-def main_convert():
-    for i in range(len(files)):
-        print(f"{i}/{len(files)}")
-        p = mp.Process(target=convert_tex, args=(files[i], "tmp2", "tmp"))
-        jobs.append(p)
-        p.start()
-        p.join()
 
 
 def fix_chars_in_dirs(paper_dir_path):
     # replace special characters in directories with underscores
     os.chdir(paper_dir_path)
+    print(f"fixing {paper_dir_path}")
     for doc in ls("."):
+        print(doc)
         if os.path.isdir(doc):
             new_doc_name = doc.translate(
                 {ord(c): "_" for c in " !@#$%^&*()[]{};:,<>?\|`~-=+"}
@@ -49,10 +48,13 @@ def fix_chars_in_dirs(paper_dir_path):
             if new_doc_name != doc:
                 os.rename(doc, new_doc_name)
 
+    chdir_up_n(2)
+    print(f"finished fixing {paper_dir_path}")
+
 
 def prepare_extracted_tars(paper_dir_path):
     # extracts tar files to tmp/{dump_name}/*
-    paper_id = paper_dir_path.split("/")[-1][:-4]
+    paper_id = paper_dir_path.split("/")[-1]
     # this loop deletes all files in tmp that are not .tex files
     try:
         for doc in lsr("tmp"):
@@ -85,7 +87,6 @@ def prepare_extracted_tars(paper_dir_path):
                     # if bbl, extract arxiv ids from citations, add to list, and delete bbl
                     arxiv_citations, bbl = get_arxiv_ids(doc)
                     # load arxiv_citations_dict json and overwrite with new citations
-                    chdir_up_n(2)
                     arxiv_citations_dict = json.load(open("arxiv_citations_dict.json"))
                     for arxiv_id in arxiv_citations:
                         if arxiv_citations_dict.get(arxiv_id) is None:
@@ -95,10 +96,9 @@ def prepare_extracted_tars(paper_dir_path):
                     json.dump(
                         arxiv_citations_dict, open("arxiv_citations_dict.json", "w")
                     )
+                    main_tex_dict[paper_id] = {}
                     main_tex_dict[paper_id]["bibliography"] = bbl
                     json.dump(main_tex_dict, open("main_tex_dict.json", "w"))
-                    os.chdir("tmp/" + paper_id)
-                    sh(f"rm {doc}")
 
                 else:
                     pass
@@ -112,54 +112,44 @@ def prepare_extracted_tars(paper_dir_path):
         print(f"Error deleting files in {paper_id}")
 
 
-if __name__ == "__main__":
-    jobs = []
+def main_convert(paper_dir_path):
     for i in range(len(files)):
         print(f"{i}/{len(files)}")
-        p = mp.Process(target=preextract_tar, args=(files[i], "tmp2", "tmp"))
-        jobs.append(p)
-        p.start()
-        p.join()
+        p = mp.Process(target=convert_tex, args=(paper_dir, "md", "out"))
 
-    jobs = []
-    for i, paper_dir in enumerate(os.listdir("tmp")):
-        print(f"{i}/{len(os.listdir('tmp'))}")
-        p = mp.Process(target=fix_chars_in_dirs, args=("tmp/" + paper_dir,))
-        jobs.append(p)
-        p.start()
-        p.join()
-
-    jobs = []
-    for i, paper_dir in enumerate(os.listdir("tmp")):
-        print(f"{i}/{len(os.listdir('tmp'))}")
-        p = mp.Process(target=prepare_extracted_tars, args=("tmp/" + paper_dir,))
-        jobs.append(p)
-        p.start()
-        p.join()
-
-    jobs = []
-    for i, paper_dir in enumerate(os.listdir("tmp")):
-        print(f"{i}/{len(os.listdir('tmp'))}")
-        p = mp.Process(target=main_convert)
-        jobs.append(p)
-        p.start()
-        p.join()
+    sh(f"mv {dump} done")
+    print(f"marking {dump} as done")
 
 
-for i, tar_filepath in enumerate(tqdm(files)):
-    print(f"{i}/{len(files)}")
-    try:
-        # process tex files
-        print("Processing paper_id:", paper_id)
-        print("Moving files to root folder...")
-        mv_files_to_root()
-        print("Converting paper...")
-        convert_tex("tmp", paper_id, main_tex_dict)
-        list_of_paper_folders = ls("tmp")
-        pool.map(convert, list_of_paper_folders)
+if __name__ == "__main__":
 
-        sh(f"mv {dump} done")
-        print(f"marking {dump} as done")
-    except:
-        sh(f"mv {dump} errored")
-        pass
+    paper_tars = ls("tmp2")
+    pool.map(preextract_tar, paper_tars)
+    paper_folders = ls("tmp")
+    pool.close()
+    pool.join()
+    for paper_dir in paper_folders:
+        fix_chars_in_dirs(paper_dir)
+    for paper_dir in paper_folders:
+        prepare_extracted_tars(paper_dir)
+    pool = mp.Pool(processes=mp.cpu_count())
+
+    # TODO: NameError: name 'main_tex_dict' is not defined
+    # mv: rename tmp/1406.2661v1 to fallback_needed/1406.2661v1/1406.2661v1: No such file or directory
+    pool.map(convert_tex, paper_folders)  # TODO: fix error
+    pool.close()
+    pool.join()
+
+# for i, tar_filepath in enumerate(tqdm(files)):
+#     print(f"{i}/{len(files)}")
+#     try:
+#         # process tex files
+#         print("Processing paper_id:", paper_id)
+#         print("Moving files to root folder...")
+#         mv_files_to_root()
+#         print("Converting paper...")
+#         convert_tex("tmp", paper_id, main_tex_dict)
+
+#     except:
+#         sh(f"mv {dump} errored")
+#         pass
