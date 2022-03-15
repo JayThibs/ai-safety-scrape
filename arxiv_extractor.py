@@ -16,7 +16,9 @@ import traceback
 # 2. run script
 
 
-sh("mkdir -p tmp out done fallback_needed errored && rm -rf tmp/*")
+sh(
+    "mkdir -p tmp out done fallback_needed errored && rm -rf tmp/* && rm -rf fallback_needed/*"
+)
 files = ls("tmp2")
 ignore_filenames = pd.read_csv("ignore_filenames.csv").values
 arxiv_citations_list = []
@@ -128,17 +130,25 @@ if __name__ == "__main__":
     paper_folders = ls("tmp")
     pool.close()
     pool.join()
-    for paper_dir in paper_folders:
-        fix_chars_in_dirs(paper_dir)
-    for paper_dir in paper_folders:
-        prepare_extracted_tars(paper_dir)
-    pool = mp.Pool(processes=mp.cpu_count())
+    for paper_folder in paper_folders:
+        try:
+            print(f"preparing {paper_folder}")
+            fix_chars_in_dirs(paper_folder)
+            prepare_extracted_tars(paper_folder)
+            convert_tex(paper_folder, main_tex_dict)
+        except ExitCodeError:
+            traceback.print_exc()
+            print(f"Error converting {paper_folder}")
+            sh(f"mv {paper_folder} fallback_needed")
+
+    # pool = mp.Pool(processes=mp.cpu_count())
 
     # TODO: NameError: name 'main_tex_dict' is not defined
     # mv: rename tmp/1406.2661v1 to fallback_needed/1406.2661v1/1406.2661v1: No such file or directory
-    pool.map(convert_tex, paper_folders)  # TODO: fix error
-    pool.close()
-    pool.join()
+    # pool.map(convert_tex, paper_folders)  # TODO: fix error
+
+    # pool.close()
+    # pool.join()
 
 # for i, tar_filepath in enumerate(tqdm(files)):
 #     print(f"{i}/{len(files)}")
