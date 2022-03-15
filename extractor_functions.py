@@ -7,6 +7,34 @@ from time import time
 import traceback
 
 
+main_tex_name_list = [
+    "main",
+    "Main",
+    "MAIN",
+    "_main",
+    "paper",
+    "Paper",
+    "PAPER",
+    "ms",
+    "arxiv",
+    "arXiv",
+    "example_paper",
+    "root",
+    "example",
+    "00_main",
+    "00_Main",
+    "00-Main",
+    "00-main",
+    "main_arxiv",
+    "main_arXiv",
+    "main-arxiv",
+    "main-arXiv",
+    "Main-arXiv",
+    "master",
+    "Master",
+]
+
+
 def any_to_utf8(b):
     """Detects encoding and converts to utf-8."""
     try:
@@ -79,7 +107,86 @@ def mv_files_to_root(rootdir="tmp"):
             )
 
 
-def convert_semiauto(rootdir="tmp", paper_id=paper_id, main_tex_dict=main_tex_dict):
+def convert_tex(paper_dir, output_type="md", output_dir="out"):
+    """
+    Converts paper tex file automatically. Sends errors to fallback_needed for conversion with convert_tex_semiauto.
+    This function is created to work with multiprocessing. paper_dir is the directory for a specific paper in tmp once
+    we've extracted the tars in tmp. An example of paper_dir is "tmp/1708.03887v2".
+    """
+    os.chdir(paper_dir)
+    main_match = False
+    paper_id = paper_dir.split("/")[-1]
+    print("Current directory: " + os.getcwd())
+    print("paper_id: " + paper_id)
+
+    try:
+        assert len(ls(".")) > 0
+        convert_to_utf8(rootdir=".")
+        tmp_contents = os.listdir()
+        num_tex_files = 0
+        print(os.listdir())
+        for doc in tmp_contents:
+            if doc.endswith(".tex"):
+                num_tex_files += 1
+                tex_doc = doc
+        if num_tex_files == 1:
+            # if there is only one tex file, use it
+            sh(f"timeout 7s pandoc -s {tex_doc} -o {paper_id}.md --wrap=none")
+            os.chdir("..")
+            os.chdir("..")
+            sh(f"mv {paper_dir}/{paper_id}.md {output_dir}/{paper_id}.md")
+            return
+        else:
+            # if there are multiple tex files,
+            # check for the main file based on a common list of names
+            for doc in ls("."):
+                doc = doc.split("/")[-1][:-4]
+                # print(doc)
+                if doc in main_tex_name_list:
+                    # if there is a common main file name, use it
+                    main_match = True
+                    sh(f"timeout 7s pandoc -s {doc}.tex -o {paper_id}.md --wrap=none")
+                    os.chdir("..")
+                    os.chdir("..")
+                    sh(f"mv {paper_dir}/{paper_id}.md {output_dir}/{paper_id}.md")
+                    return
+        if not main_match:
+            if paper_id in main_tex_dict:
+                # if main file was stored in main_tex_dict, use it
+                main_tex = main_tex_dict[paper_id]
+            else:
+                # can't find main file, so send to fallback_needed
+                print(
+                    f"{paper_id} not found in main_tex_dict, sending to fallback_needed"
+                )
+                os.chdir("..")
+                sh(f"mv {paper_dir} fallback_needed")
+                return
+
+            sh(f"timeout 7s pandoc -s {main_tex} -o {paper_id}.md --wrap=none")
+
+        os.chdir("..")
+        print("Current directory: " + os.getcwd())
+        sh(f"mv tmp/{paper_id}.md out/{paper_id}.md")
+
+    except:
+        traceback.print_exc()
+        print("Error converting paper. Moving to fallback pile...")
+        if os.getcwd().split("/")[-1] == "tmp":
+            os.chdir("..")
+        # fallback:
+        try:
+            # move to fallback pile so we can handle it later
+            sh(
+                f"mkdir -p fallback_needed/{paper_id} && mv tmp/* fallback_needed/{paper_id}/"
+            )
+        except ExitCodeError:
+            traceback.print_exc()
+
+        assert os.path.exists(f"out/{paper_id}.md")  # to send tar to errored pile
+
+
+def convert_tex_semiauto(rootdir="tmp", paper_id=paper_id, main_tex_dict=main_tex_dict):
     """
     Converts paper tex files semi-automatically. If there are multiple tex files,
     it will check for a list of common "main" file names and use the first one found.
@@ -106,32 +213,7 @@ def convert_semiauto(rootdir="tmp", paper_id=paper_id, main_tex_dict=main_tex_di
             for doc in ls("."):
                 doc = doc.split("/")[-1][:-4]
                 # print(doc)
-                if doc in [
-                    "main",
-                    "Main",
-                    "MAIN",
-                    "_main",
-                    "paper",
-                    "Paper",
-                    "PAPER",
-                    "ms",
-                    "arxiv",
-                    "arXiv",
-                    "example_paper",
-                    "root",
-                    "example",
-                    "00_main",
-                    "00_Main",
-                    "00-Main",
-                    "00-main",
-                    "main_arxiv",
-                    "main_arXiv",
-                    "main-arxiv",
-                    "main-arXiv",
-                    "Main-arXiv",
-                    "master",
-                    "Master",
-                ]:
+                if doc in main_tex_name_list:
                     # if there is a common main file name, use it
                     main_match = True
                     sh(f"timeout 7s pandoc -s {doc}.tex -o {paper_id}.md --wrap=none")
