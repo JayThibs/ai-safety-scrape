@@ -34,6 +34,12 @@ def fread(fname):
         return fh.read()
 
 
+def chdir_up_n(n):
+    """Goes up n times in the directory tree."""
+    for i in range(n):
+        os.chdir("..")
+
+
 class each:
     def __init__(self, f):
         self.f = f
