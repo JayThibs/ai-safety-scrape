@@ -116,7 +116,6 @@ def convert_tex(paper_dir, output_type="md", output_dir="out"):
     we've extracted the tars in tmp. An example of paper_dir is "tmp/1708.03887v2".
     """
     os.chdir(paper_dir)
-    main_match = False
     paper_id = paper_dir.split("/")[-1]
     print("Current directory: " + os.getcwd())
     print("paper_id: " + paper_id)
@@ -142,13 +141,14 @@ def convert_tex(paper_dir, output_type="md", output_dir="out"):
             # if there are multiple tex files,
             # check for the main file based on a common list of names
             for doc in lsr("."):
-                path_to_doc = doc.split("/")[:-1]
+                path_to_doc = doc.split("/")[1:-1]  # subdirectory path
                 doc = doc.split("/")[-1]
                 # print(doc)
                 if doc in main_tex_name_list:
                     # if there is a common main file name, use it
                     if len(path_to_doc) == 0:
                         sh(f"timeout 7s pandoc -s {doc} -o {paper_id}.md --wrap=none")
+                        # go back to root
                         os.chdir("..")
                         os.chdir("..")
                         sh(f"mv {paper_dir}/{paper_id}.md {output_dir}/{paper_id}.md")
@@ -158,8 +158,10 @@ def convert_tex(paper_dir, output_type="md", output_dir="out"):
                         # change to that directory and use the common file name
                         os.chdir(path_to_doc)
                         sh(f"timeout 7s pandoc -s {doc} -o {paper_id}.md --wrap=none")
+                        # go back to root
                         for i in range(len(path_to_doc) + 2):
                             os.chdir("..")
+                        path_to_doc = "/".join(path_to_doc)
                         sh(
                             f"mv {paper_dir}/{path_to_doc}/{paper_id}.md {output_dir}/{paper_id}.md"
                         )
