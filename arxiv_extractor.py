@@ -132,7 +132,7 @@ if __name__ == "__main__":
             print(f"preparing {paper_folder}")
             fix_chars_in_dirs(paper_folder)
             prepare_extracted_tars(paper_folder)
-            convert_tex(paper_folder, main_tex_dict)
+            convert_tex(paper_dir=paper_folder, main_tex_dict=main_tex_dict)
         except ExitCodeError:
             traceback.print_exc()
             print(f"Error converting {paper_folder}")
