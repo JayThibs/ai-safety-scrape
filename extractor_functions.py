@@ -67,20 +67,6 @@ def preextract_tar(tar_filepath, input_dir="files", output_dir="tmp"):
     )
 
 
-# def copy_tar(tar_filepath, input_dir="files", output_dir="tmp"):
-#     """Copies tar files from tmp2/{dump_name}/* to tmp/."""
-#     tar_name = tar_filepath.split("/")[-1][:-4]
-#     # print(dump_name)
-#     for i in range(120):
-#         if os.path.exists(f"tmp2/done_{tar_name}"):
-#             sh(f"mv tmp2/{tar_name}/* tmp")
-#             return True
-#         print("waiting for tar...")
-#         time.sleep(1)
-
-#     return False
-
-
 def mv_files_to_root(rootdir="tmp"):
     """Moves all files in root folder subdirectories to root folder."""
     for doc in ls(rootdir):
@@ -122,6 +108,7 @@ def convert_tex(paper_dir, output_type="md", output_dir="out", main_tex_dict={})
             sh(f"timeout 7s pandoc -s {tex_doc} -o {paper_id}.md --wrap=none")
             os.chdir(project_dir)
             sh(f"mv {paper_dir}/{paper_id}.md {output_dir}/{paper_id}.md")
+            main_tex_dict[paper_id]["main_tex_filename"] = tex_doc
             return
         else:
             # if there are multiple tex files,
@@ -139,6 +126,7 @@ def convert_tex(paper_dir, output_type="md", output_dir="out", main_tex_dict={})
                 # change to that directory and use the common file name
                 os.chdir(path_to_doc)
                 sh(f"timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none")
+                main_tex_dict[paper_id]["main_tex_filename"] = main_doc
                 # go back to root
                 os.chdir(project_dir)
                 print(f"Current directory: {os.getcwd()}")
@@ -154,13 +142,12 @@ def convert_tex(paper_dir, output_type="md", output_dir="out", main_tex_dict={})
                     for doc in list_of_tex_files
                     if doc.split("/")[-1].lower() not in filenames_to_ignore
                 ]
-                # matched_list = [(doc.split("/")[-1], doc.split(("/")[1:-1])) for name, doc in
-                #                 zip(main_tex_name_list, lsr(".")) if name not in filenames_to_ignore]
                 if len(matched_list) == 1:
                     main_doc, path_to_doc = matched_list[0]
                     # change to that directory and use the common file name
                     os.chdir(path_to_doc)
                     sh(f"timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none")
+                    main_tex_dict[paper_id]["main_tex_filename"] = main_doc
                     # go back to root
                     os.chdir(project_dir)
                     print(f"Current directory: {os.getcwd()}")
@@ -190,15 +177,7 @@ def convert_tex(paper_dir, output_type="md", output_dir="out", main_tex_dict={})
         traceback.print_exc()
         print("Error converting paper. Moving to fallback pile...")
         os.chdir(project_dir)
-        # with open(f"fallback_needed/{paper_id}_error.txt", "w") as f:
-        #     traceback.print_exc(file=f)
-        #     exc_info = sys.exc_info()
-        #     exc_info = str(exc_info)
-        #     f.write(f"{paper_id} error: {exc_info}")
         print(f"Error: Current directory: {os.getcwd()}")
-        # fallback:
-        # move to fallback pile so we can handle it later
-        # sh(f"rm -rf fallback_needed/{paper_id}")
         sh(f"mv -f {paper_dir} fallback_needed")
 
 
