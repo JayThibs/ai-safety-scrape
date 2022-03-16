@@ -19,10 +19,10 @@ files = ls("files")
 ignore_filenames = pd.read_csv("ignore_filenames.csv").values
 arxiv_citations_list = []
 
-if os.path.exists("main_tex_dict.json"):
-    main_tex_dict = json.load(open("main_tex_dict.json"))
+if os.path.exists("arxiv_dict.json"):
+    arxiv_dict = json.load(open("arxiv_dict.json"))
 else:
-    main_tex_dict = {}
+    arxiv_dict = {}
 
 if os.path.exists("arxiv_citations_dict.json"):
     arxiv_citations_dict = json.load(open("arxiv_citations_dict.json"))
@@ -132,7 +132,7 @@ if __name__ == "__main__":
             print(f"preparing {paper_folder}")
             fix_chars_in_dirs(paper_folder)
             prepare_extracted_tars(paper_folder)
-            convert_tex(paper_dir=paper_folder, main_tex_dict=main_tex_dict)
+            convert_tex(paper_dir=paper_folder, arxiv_dict=arxiv_dict)
         except ExitCodeError:
             traceback.print_exc()
             print(f"Error converting {paper_folder}")
