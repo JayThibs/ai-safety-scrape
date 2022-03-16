@@ -12,16 +12,6 @@ import traceback
 import logging
 
 
-# HOW TO USE FOR TESTING:
-# 1. Put a dozen tars in tmp2/
-# 2. run script
-
-
-# # log everything to a file
-# logging.basicConfig(filename="log.txt", level=logging.DEBUG)
-# sys.stdout = open("out.log", "w")
-# sys.stderr = sys.stdout
-
 sh(
     "mkdir -p tmp out done fallback_needed errored && rm -rf tmp/* && rm -rf fallback_needed/*"
 )
@@ -136,7 +126,8 @@ if __name__ == "__main__":
     paper_folders = ls("tmp")
     pool.close()
     pool.join()
-    for paper_folder in paper_folders:
+    for i, paper_folder in enumerate(tqdm(paper_folders)):
+        print(f"{i}/{len(paper_folders)}")
         try:
             print(f"preparing {paper_folder}")
             fix_chars_in_dirs(paper_folder)
@@ -144,33 +135,5 @@ if __name__ == "__main__":
             convert_tex(paper_folder, main_tex_dict)
         except ExitCodeError:
             traceback.print_exc()
-            # create log file for traceback failed paper
-            # with open(
-            #     f"fallback_needed/{paper_folder.split('/')[-1]}_error.txt", "w"
-            # ) as f:
-            #     traceback.print_exc(file=f)
             print(f"Error converting {paper_folder}")
             sh(f"mv {paper_folder} fallback_needed")
-
-    # pool = mp.Pool(processes=mp.cpu_count())
-
-    # TODO: NameError: name 'main_tex_dict' is not defined
-    # mv: rename tmp/1406.2661v1 to fallback_needed/1406.2661v1/1406.2661v1: No such file or directory
-    # pool.map(convert_tex, paper_folders)  # TODO: fix error
-
-    # pool.close()
-    # pool.join()
-
-# for i, tar_filepath in enumerate(tqdm(files)):
-#     print(f"{i}/{len(files)}")
-#     try:
-#         # process tex files
-#         print("Processing paper_id:", paper_id)
-#         print("Moving files to root folder...")
-#         mv_files_to_root()
-#         print("Converting paper...")
-#         convert_tex("tmp", paper_id, main_tex_dict)
-
-#     except:
-#         sh(f"mv {dump} errored")
-#         pass
