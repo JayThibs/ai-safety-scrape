@@ -81,7 +81,9 @@ def mv_files_to_root(rootdir="tmp"):
             )
 
 
-def convert_tex(paper_dir, output_type="md", output_dir="out", arxiv_dict={}):
+def convert_tex(
+    paper_dir, output_dir="out", main_tex_output_dir="outtxt", arxiv_dict=None
+):
     """
     Converts paper tex file automatically. Sends errors to fallback_needed for conversion with convert_tex_semiauto.
     This function is created to work with multiprocessing. paper_dir is the directory for a specific paper in tmp once
@@ -108,7 +110,12 @@ def convert_tex(paper_dir, output_type="md", output_dir="out", arxiv_dict={}):
             sh(f"timeout 7s pandoc -s {tex_doc} -o {paper_id}.md --wrap=none")
             os.chdir(project_dir)
             sh(f"mv {paper_dir}/{paper_id}.md {output_dir}/{paper_id}.md")
-            arxiv_dict[paper_id]["main_tex_filename"] = tex_doc
+            # TODO: there's a better way to do this, but to make multiprocessing work,
+            # I'm going to create a .txt file for each paper and store the main_tex_name in it.
+            # This is a hacky way to do it, but it works. Once the extraction is done,
+            # we can use the .txt file to get the main_tex_name and store it in the arxiv_dict.
+            with open(f"{main_tex_output_dir}/{paper_id}.txt", "w") as f:
+                f.write(tex_doc)
             return
         else:
             # if there are multiple tex files,
@@ -126,11 +133,12 @@ def convert_tex(paper_dir, output_type="md", output_dir="out", arxiv_dict={}):
                 # change to that directory and use the common file name
                 os.chdir(path_to_doc)
                 sh(f"timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none")
-                arxiv_dict[paper_id]["main_tex_filename"] = main_doc
                 # go back to root
                 os.chdir(project_dir)
                 print(f"Current directory: {os.getcwd()}")
                 sh(f"mv {paper_dir}/{paper_id}.md {output_dir}/{paper_id}.md")
+                with open(f"{main_tex_output_dir}/{paper_id}.txt", "w") as f:
+                    f.write(main_doc)
                 return
             else:
                 list_of_tex_files = [
@@ -147,19 +155,20 @@ def convert_tex(paper_dir, output_type="md", output_dir="out", arxiv_dict={}):
                     # change to that directory and use the common file name
                     os.chdir(path_to_doc)
                     sh(f"timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none")
-                    arxiv_dict[paper_id]["main_tex_filename"] = main_doc
                     # go back to root
                     os.chdir(project_dir)
                     print(f"Current directory: {os.getcwd()}")
                     sh(f"mv {paper_dir}/{paper_id}.md {output_dir}/{paper_id}.md")
+                    with open(f"{main_tex_output_dir}/{paper_id}.txt", "w") as f:
+                        f.write(main_doc)
                     return
 
-            if paper_id in arxiv_dict:
+            if arxiv_dict[paper_id]["main_tex_filename"] != "":
                 # if main file was stored in arxiv_dict, use it
                 # arxiv_dict is created when we need to use convert_tex_semiauto and manually inputting main tex filename
                 main_tex = arxiv_dict[paper_id]["main_tex_filename"]
                 sh(f"timeout 7s pandoc -s {main_tex} -o {paper_id}.md --wrap=none")
-                chdir_up_n(2)
+                os.chdir(project_dir)
                 sh(f"mv {paper_dir}/{paper_id}.md out/{paper_id}.md")
                 return
             else:
@@ -169,7 +178,7 @@ def convert_tex(paper_dir, output_type="md", output_dir="out", arxiv_dict={}):
                 print(
                     f"{paper_id} main filename not found in main_tex_dict, sending to fallback_needed"
                 )
-                chdir_up_n(2)
+                os.chdir(project_dir)
                 sh(f"mv {paper_dir} fallback_needed")
                 return
 

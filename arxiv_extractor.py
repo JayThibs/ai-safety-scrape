@@ -1,21 +1,23 @@
 import os
+from timeit import repeat
 from utils import *
 from extractor_functions import *
 import magic
 
 mime = magic.Magic(mime=True)
 import multiprocessing as mp
+from itertools import repeat
+import pprint
 from tqdm import tqdm
 import json
 import pandas as pd
 import traceback
-import logging
 
 
 sh(
-    "mkdir -p tmp out done fallback_needed errored && rm -rf tmp/* && rm -rf fallback_needed/*"
+    "mkdir -p tmp out done fallback_needed outtxt errored && rm -rf tmp/* && rm -rf fallback_needed/* &&  rm -rf outtxt/*"
 )
-files = ls("files")
+files = ls("tmp2")
 ignore_filenames = pd.read_csv("ignore_filenames.csv").values
 arxiv_citations_list = []
 
@@ -121,7 +123,8 @@ def main_convert(paper_dir_path):
 
 if __name__ == "__main__":
 
-    paper_tars = ls("files")
+    print(arxiv_dict["1310.4546"])
+    paper_tars = ls("tmp2")
     pool.map(preextract_tar, paper_tars)
     paper_folders = ls("tmp")
     pool.close()
@@ -132,8 +135,50 @@ if __name__ == "__main__":
             print(f"preparing {paper_folder}")
             fix_chars_in_dirs(paper_folder)
             prepare_extracted_tars(paper_folder)
-            convert_tex(paper_dir=paper_folder, arxiv_dict=arxiv_dict)
+            # convert_tex(paper_dir=paper_folder)
         except ExitCodeError:
             traceback.print_exc()
             print(f"Error converting {paper_folder}")
             sh(f"mv {paper_folder} fallback_needed")
+
+    with mp.Manager() as manager:
+        d = manager.dict()
+        d.update(arxiv_dict)
+        with manager.Pool() as pool:
+            pool.map(convert_tex, (paper_folder, repeat(d, len(paper_folders))))
+        # `d` is a DictProxy object that can be converted to dict
+        # pprint.pprint(dict(d))
+
+    # # pool.map(convert_tex, paper_folders, initargs=(arxiv_dict,))
+    # pool.close()
+    # pool.join()
+    # print("Finished converting all papers.")
+    # print("Updating arxiv_dict.json...")
+    # # loop through files in out/ and outtxt/ and add to arxiv_dict
+    # for i, mdfile in enumerate(tqdm(ls("out"))):
+    #     print(f"{i}/{len(ls('out'))}")
+    #     try:
+    #         with open(f"{mdfile}", "r") as f:
+    #             mdtext = f.read()
+    #         arxiv_id = ".".join(mdfile.split("/")[-1].split(".")[0:2]).split("v")[0]
+    #         arxiv_dict[arxiv_id]["text"] = mdtext
+    #     except ExitCodeError:
+    #         traceback.print_exc()
+    #         print(f"Error reading {mdfile}")
+
+    # for i, main_tex_name_txt in enumerate(tqdm(ls("outtxt"))):
+    #     print(f"{i}/{len(ls('outtxt'))}")
+    #     try:
+    #         with open(f"{main_tex_name_txt}", "r") as f:
+    #             main_tex_name = f.read()
+    #         arxiv_id = ".".join(main_tex_name.split("/")[-1].split(".")[0:2]).split(
+    #             "v"
+    #         )[0]
+    #         arxiv_dict[arxiv_id]["main_tex_filename"] = main_tex_name
+    #     except ExitCodeError:
+    #         traceback.print_exc()
+    #         print(f"Error reading {main_tex_name_txt}")
+
+    print(arxiv_dict["1310.4546"])
+    # json.dump(arxiv_dict, open("arxiv_dict.json", "w"))
+    print("Finished updating arxiv_dict.json.")
