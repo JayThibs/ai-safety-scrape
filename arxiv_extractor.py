@@ -14,7 +14,7 @@ import traceback
 
 
 sh(
-    "mkdir -p tmp out done fallback_needed outtxt errored && rm -rf fallback_needed/* && rm -rf arxiv_citations_dict.json"
+    "mkdir -p tmp out done fallback_needed outtxt errored && rm -rf fallback_needed/* && rm -rf out/* && rm -rf error_log.txt"
 )
 files = ls("files")
 ignore_filenames = pd.read_csv("ignore_filenames.csv").values
@@ -125,24 +125,24 @@ def main_convert(paper_dir_path):
 
 if __name__ == "__main__":
 
-    # print(arxiv_dict["1310.4546"])
-    # # print(arxiv_dict["1202.6177"])
-    # paper_tars = ls("files")
-    # pool.map(preextract_tar, paper_tars)
-    # paper_folders = ls("tmp")
-    # pool.close()
-    # pool.join()
-    # for i, paper_folder in enumerate(tqdm(paper_folders)):
-    #     print(f"{i}/{len(paper_folders)}")
-    #     try:
-    #         print(f"preparing {paper_folder}")
-    #         fix_chars_in_dirs(paper_folder)
-    #         prepare_extracted_tars(paper_folder)
-    #         convert_tex(paper_dir=paper_folder, arxiv_dict=arxiv_dict)
-    #     except ExitCodeError:
-    #         traceback.print_exc()
-    #         print(f"Error converting {paper_folder}")
-    #         sh(f"mv {paper_folder} fallback_needed")
+    print(arxiv_dict["1310.4546"])
+    # print(arxiv_dict["1202.6177"])
+    paper_tars = ls("files")
+    pool.map(preextract_tar, paper_tars)
+    paper_folders = ls("tmp")
+    pool.close()
+    pool.join()
+    for i, paper_folder in enumerate(tqdm(paper_folders[0:30])):
+        print(f"{i}/{len(paper_folders)}")
+        try:
+            print(f"preparing {paper_folder}")
+            fix_chars_in_dirs(paper_folder)
+            prepare_extracted_tars(paper_folder)
+            convert_tex(paper_dir=paper_folder, arxiv_dict=arxiv_dict)
+        except ExitCodeError:
+            traceback.print_exc()
+            print(f"Error converting {paper_folder}")
+            sh(f"mv {paper_folder} fallback_needed")
 
     # with mp.Manager() as manager:
     #     d = manager.dict()
