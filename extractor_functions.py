@@ -123,7 +123,7 @@ def convert_tex(
             with open(f"{paper_id}.md", "r") as f:
                 paper_text = f.read()
             arxiv_dict[number_id]["text"] = paper_text
-            arxiv_dict[number_id]["main_tex_name"] = main_doc
+            arxiv_dict[number_id]["main_tex_filename"] = main_doc
             os.chdir(project_dir)
             sh(f"mv {paper_dir}/{paper_id}.md {output_dir}/{paper_id}.md")
             # TODO: there's a better way to do this, but to make multiprocessing work,
@@ -152,7 +152,7 @@ def convert_tex(
                 with open(f"{paper_id}.md", "r") as f:
                     paper_text = f.read()
                 arxiv_dict[number_id]["text"] = paper_text
-                arxiv_dict[number_id]["main_tex_name"] = main_doc
+                arxiv_dict[number_id]["main_tex_filename"] = main_doc
                 # go back to root
                 os.chdir(project_dir)
                 print(f"Current directory: {os.getcwd()}")
@@ -178,7 +178,7 @@ def convert_tex(
                     with open(f"{paper_id}.md", "r") as f:
                         paper_text = f.read()
                     arxiv_dict[number_id]["text"] = paper_text
-                    arxiv_dict[number_id]["main_tex_name"] = main_doc
+                    arxiv_dict[number_id]["main_tex_filename"] = main_doc
                     # go back to root
                     os.chdir(project_dir)
                     print(f"Current directory: {os.getcwd()}")

@@ -125,24 +125,24 @@ def main_convert(paper_dir_path):
 
 if __name__ == "__main__":
 
-    print(arxiv_dict["1310.4546"])
-    # print(arxiv_dict["1202.6177"])
-    paper_tars = ls("files")
-    pool.map(preextract_tar, paper_tars)
-    paper_folders = ls("tmp")
-    pool.close()
-    pool.join()
-    for i, paper_folder in enumerate(tqdm(paper_folders)):
-        print(f"{i}/{len(paper_folders)}")
-        try:
-            print(f"preparing {paper_folder}")
-            fix_chars_in_dirs(paper_folder)
-            prepare_extracted_tars(paper_folder)
-            convert_tex(paper_dir=paper_folder, arxiv_dict=arxiv_dict)
-        except ExitCodeError:
-            traceback.print_exc()
-            print(f"Error converting {paper_folder}")
-            sh(f"mv {paper_folder} fallback_needed")
+    # print(arxiv_dict["1310.4546"])
+    # # print(arxiv_dict["1202.6177"])
+    # paper_tars = ls("files")
+    # pool.map(preextract_tar, paper_tars)
+    # paper_folders = ls("tmp")
+    # pool.close()
+    # pool.join()
+    # for i, paper_folder in enumerate(tqdm(paper_folders)):
+    #     print(f"{i}/{len(paper_folders)}")
+    #     try:
+    #         print(f"preparing {paper_folder}")
+    #         fix_chars_in_dirs(paper_folder)
+    #         prepare_extracted_tars(paper_folder)
+    #         convert_tex(paper_dir=paper_folder, arxiv_dict=arxiv_dict)
+    #     except ExitCodeError:
+    #         traceback.print_exc()
+    #         print(f"Error converting {paper_folder}")
+    #         sh(f"mv {paper_folder} fallback_needed")
 
     # with mp.Manager() as manager:
     #     d = manager.dict()
@@ -165,10 +165,10 @@ if __name__ == "__main__":
         try:
             with open(f"{mdfile}", "rb") as f:
                 mdtext = f.read()
-            print(f"{mdtext}")
             mdtext = any_to_utf8(mdtext)
+            print(f"{mdtext}")
             arxiv_id = ".".join(mdfile.split("/")[-1].split(".")[0:2]).split("v")[0]
-            arxiv_dict[arxiv_id]["text"] = mdtext
+            arxiv_dict[arxiv_id]["text"] = mdtext.split("/")[-1]
         except ExitCodeError and KeyError:
             traceback.print_exc()
             print(f"Error reading {mdfile}")
@@ -179,16 +179,16 @@ if __name__ == "__main__":
             # load main_tex_name_txt
             with open(f"{main_tex_name_txt}", "rb") as f:
                 main_tex_name = f.read()
-            print(f"{main_tex_name}")
             main_tex_name = any_to_utf8(main_tex_name)
-            arxiv_id = ".".join(main_tex_name.split("/")[-1].split(".")[0:2]).split(
+            print(f"{main_tex_name}")
+            arxiv_id = ".".join(main_tex_name_txt.split("/")[-1].split(".")[0:2]).split(
                 "v"
             )[0]
-            arxiv_dict[arxiv_id]["main_tex_filename"] = main_tex_name
+            arxiv_dict[arxiv_id]["main_tex_filename"] = main_tex_name.split("/")[-1]
         except ExitCodeError and KeyError:
             traceback.print_exc()
             print(f"Error reading {main_tex_name_txt}")
 
-    print(arxiv_dict["1310.4546"])
+    print(arxiv_dict[arxiv_id])
     json.dump(arxiv_dict, open("arxiv_dict_updated.json", "w"))
     print("Finished updating arxiv_dict.json.")
