@@ -62,8 +62,11 @@ def preextract_tar(tar_filepath, input_dir="files", output_dir="tmp"):
     Creates tmp/done_{tar_name} file to signal copy_tar that extraction is done.
     """
     tar_name = tar_filepath.split("/")[-1][:-4]
+    if os.path.exists(f"{output_dir}/{tar_name}"):
+        print(f"{tar_name} already extracted.")
+        return
     sh(
-        f"(mkdir -p {output_dir}/{tar_name}; tar xf {tar_filepath} -C {output_dir}/{tar_name} && touch {input_dir}/done_{tar_name}; echo finished preload of {tar_name}) &"
+        f"(mkdir -p {output_dir}/{tar_name}; tar xf {tar_filepath} -C {output_dir}/{tar_name}; echo finished preload of {tar_name}) &"
     )
 
 
@@ -82,20 +85,29 @@ def mv_files_to_root(rootdir="tmp"):
 
 
 def convert_tex(
-    paper_dir, output_dir="out", main_tex_output_dir="outtxt", arxiv_dict=None
+    paper_dir,
+    arxiv_dict,
+    output_dir="out",
+    main_tex_output_dir="outtxt",
 ):
     """
     Converts paper tex file automatically. Sends errors to fallback_needed for conversion with convert_tex_semiauto.
     This function is created to work with multiprocessing. paper_dir is the directory for a specific paper in tmp once
     we've extracted the tars in tmp. An example of paper_dir is "tmp/1708.03887v2".
     """
-    os.chdir(paper_dir)
-    project_dir = "/".join(os.getcwd().split("/")[:-2])
-    paper_id = paper_dir.split("/")[-1]
-    print("Current directory: " + os.getcwd())
-    print("paper_id: " + paper_id)
 
     try:
+        paper_id = paper_dir.split("/")[-1]
+        if os.path.exists(f"{output_dir}/{paper_id}.md"):
+            print(f"{paper_id}.md already exists.")
+            return
+        print(f"Converting {paper_dir}")
+        os.chdir(paper_dir)
+        project_dir = "/".join(os.getcwd().split("/")[:-2])
+        number_id = str(paper_id.split("v")[0])
+        print(arxiv_dict[number_id])
+        print("Current directory: " + os.getcwd())
+        print("paper_id: " + paper_id)
         assert len(ls(".")) > 0
         convert_to_utf8(rootdir=".")
         tmp_contents = ls(".")
@@ -104,10 +116,14 @@ def convert_tex(
         for doc in tmp_contents:
             if doc.endswith(".tex"):
                 num_tex_files += 1
-                tex_doc = doc
+                main_doc = doc
         if num_tex_files == 1:
             # if there is only one tex file, use it
-            sh(f"timeout 7s pandoc -s {tex_doc} -o {paper_id}.md --wrap=none")
+            sh(f"timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none")
+            with open(f"{paper_id}.md", "r") as f:
+                paper_text = f.read()
+            arxiv_dict[number_id]["text"] = paper_text
+            arxiv_dict[number_id]["main_tex_name"] = main_doc
             os.chdir(project_dir)
             sh(f"mv {paper_dir}/{paper_id}.md {output_dir}/{paper_id}.md")
             # TODO: there's a better way to do this, but to make multiprocessing work,
@@ -115,7 +131,7 @@ def convert_tex(
             # This is a hacky way to do it, but it works. Once the extraction is done,
             # we can use the .txt file to get the main_tex_name and store it in the arxiv_dict.
             with open(f"{main_tex_output_dir}/{paper_id}.txt", "w") as f:
-                f.write(tex_doc)
+                f.write(main_doc)
             return
         else:
             # if there are multiple tex files,
@@ -133,6 +149,10 @@ def convert_tex(
                 # change to that directory and use the common file name
                 os.chdir(path_to_doc)
                 sh(f"timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none")
+                with open(f"{paper_id}.md", "r") as f:
+                    paper_text = f.read()
+                arxiv_dict[number_id]["text"] = paper_text
+                arxiv_dict[number_id]["main_tex_name"] = main_doc
                 # go back to root
                 os.chdir(project_dir)
                 print(f"Current directory: {os.getcwd()}")
@@ -155,6 +175,10 @@ def convert_tex(
                     # change to that directory and use the common file name
                     os.chdir(path_to_doc)
                     sh(f"timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none")
+                    with open(f"{paper_id}.md", "r") as f:
+                        paper_text = f.read()
+                    arxiv_dict[number_id]["text"] = paper_text
+                    arxiv_dict[number_id]["main_tex_name"] = main_doc
                     # go back to root
                     os.chdir(project_dir)
                     print(f"Current directory: {os.getcwd()}")
@@ -163,11 +187,14 @@ def convert_tex(
                         f.write(main_doc)
                     return
 
-            if arxiv_dict[paper_id]["main_tex_filename"] != "":
+            if arxiv_dict[number_id]["main_tex_filename"] != "":
                 # if main file was stored in arxiv_dict, use it
                 # arxiv_dict is created when we need to use convert_tex_semiauto and manually inputting main tex filename
-                main_tex = arxiv_dict[paper_id]["main_tex_filename"]
+                main_tex = arxiv_dict[number_id]["main_tex_filename"]
                 sh(f"timeout 7s pandoc -s {main_tex} -o {paper_id}.md --wrap=none")
+                with open(f"{paper_id}.md", "r") as f:
+                    paper_text = f.read()
+                arxiv_dict[number_id]["text"] = paper_text
                 os.chdir(project_dir)
                 sh(f"mv {paper_dir}/{paper_id}.md out/{paper_id}.md")
                 return
@@ -182,12 +209,18 @@ def convert_tex(
                 sh(f"mv {paper_dir} fallback_needed")
                 return
 
-    except ExitCodeError:
-        traceback.print_exc()
-        print("Error converting paper. Moving to fallback pile...")
-        os.chdir(project_dir)
-        print(f"Error: Current directory: {os.getcwd()}")
-        sh(f"mv -f {paper_dir} fallback_needed")
+    except:
+        try:
+            traceback.print_exc()
+            print("Error converting paper. Moving to fallback pile...")
+            os.chdir(project_dir)
+            print(f"Error: Current directory: {os.getcwd()}")
+            sh(f"mv -f {paper_dir} fallback_needed")
+            pass
+        except:
+            traceback.print_exc()
+            print("Error moving paper to fallback pile.")
+            pass
 
 
 def convert_tex_semiauto(rootdir="tmp", paper_id=None, arxiv_dict=None):
