@@ -64,12 +64,9 @@ ignore_list_title = [
 
 def modify_caps(ignore_list_title):
     ignore_list_lower = []
-    ignore_list_cap = []
     for item in ignore_list_title:
-        ignore_list_lower.append(item.lower())
-        ignore_list_cap.append(item.upper())
-    ignore_list = ignore_list_title + ignore_list_lower + ignore_list_cap
-    return ignore_list
+        ignore_list_lower.append(f"{item.lower()}.tex")
+    return ignore_list_lower
 
 
 ignore_list = modify_caps(ignore_list_title)
