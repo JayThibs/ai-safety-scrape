@@ -7,6 +7,7 @@ from utils import *
 from time import time
 import traceback
 import pickle
+from tika import parser
 
 
 main_tex_name_list = [
@@ -19,6 +20,8 @@ main_tex_name_list = [
     "master",
     "sample",
 ]
+
+main_tex_name_substrings = ["nips", "iclr", "conference", "corl", "neurips", "icml"]
 
 main_tex_name_list = [f"{item}.tex" for item in main_tex_name_list]
 
@@ -102,23 +105,47 @@ def convert_tex(
             print(f"{paper_id}.md already exists.")
             return
         os.chdir(paper_dir)
+        paper_dir_full = os.getcwd()
         project_dir = "/".join(os.getcwd().split("/")[:-2])
         number_id = str(paper_id.split("v")[0])
-        # print(arxiv_dict[number_id])
         print("Current directory: " + os.getcwd())
         print("paper_id: " + paper_id)
         assert len(ls(".")) > 0
         convert_to_utf8(rootdir=".")
-        tmp_contents = ls(".")
-        num_tex_files = 0
+        paper_dir_root = ls(".")
+        paper_dir_all_files = lsr(".")
+        num_tex_files = num_pdf_files = root_tex_files = 0
         print(os.listdir())
-        for doc in tmp_contents:
-            if doc.endswith(".tex"):
+        main_pdf = None
+        for file in paper_dir_all_files:
+            if file.endswith(".tex"):
                 num_tex_files += 1
+            elif file.endswith(".pdf"):
+                if re.findall(r"(\d{4}\.\d{4,5})", file):
+                    main_pdf = file
+                num_pdf_files += 1
+        if num_pdf_files > 0 and num_tex_files == 0:
+            print("Paper only contains PDF. Not LaTeX files. Skipping conversion.")
+            os.chdir(project_dir)
+            arxiv_dict[number_id]["source_filetype"] = "pdf"
+            arxiv_dict[number_id]["converted_with"] = ""
+            json.dump(arxiv_dict, open("arxiv_dict.json", "w"))
+            sh(f"mv -f {paper_dir} fallback_needed/pdf_only")
+            return
+        for doc in paper_dir_root:
+            if doc.endswith(".tex"):
+                root_tex_files += 1
                 main_doc = doc
-        if num_tex_files == 1:
+        if root_tex_files == 1:
             # if there is only one tex file, use it
-            sh(f"timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none")
+            sh(
+                f"if ! timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none; then touch {paper_id}_pandoc_failed; fi"
+            )
+            if os.path.exists(f"{paper_id}_pandoc_failed"):
+                print(f"{paper_id} failed to convert with pandoc.")
+                os.chdir(project_dir)
+                sh(f"mv -f {paper_dir} errored/pandoc_failures/")
+                return
             with open(f"{paper_id}.md", "r") as f:
                 paper_text = f.read()
             arxiv_dict[number_id]["text"] = paper_text
@@ -139,17 +166,37 @@ def convert_tex(
             filenames_to_ignore = pickle.load(
                 open(f"{project_dir}/ignore_dict.pkl", "rb")
             )
-            os.chdir(paper_dir)
-            matched_list = [
-                doc.split("/")[-1]
-                for name, doc in zip(main_tex_name_list, ls("."))
-                if name in doc.split("/")[-1].lower()
+            print(filenames_to_ignore)
+            os.chdir(paper_dir_full)
+            list_of_tex_files = [
+                doc.split("/")[-1] for doc in ls(".") if doc.endswith(".tex")
             ]
+            print(list_of_tex_files)
+            print(main_tex_name_list)
+            matched_list = [
+                doc for doc in list_of_tex_files if doc.lower() in main_tex_name_list
+            ]
+            if len(matched_list) == 0:
+                # if there are no matches with main list, try substring list
+                # these are typically conference names with a lot of variations (e.g. "icml2020.tex")
+                for tex_substring in main_tex_name_substrings:
+                    matched_list = [
+                        doc for doc in list_of_tex_files if tex_substring in doc.lower()
+                    ]
+                    if len(matched_list) > 0:
+                        break
             print(matched_list)
             if matched_list:
                 main_doc = matched_list[0]
                 # change to that directory and use the common file name
-                sh(f"timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none")
+                sh(
+                    f"if ! timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none; then touch {paper_id}_pandoc_failed; fi"
+                )
+                if os.path.exists(f"{paper_id}_pandoc_failed"):
+                    print(f"{paper_id} failed to convert with pandoc.")
+                    os.chdir(project_dir)
+                    sh(f"mv -f {paper_dir} errored/pandoc_failures/")
+                    return
                 with open(f"{paper_id}.md", "r") as f:
                     paper_text = f.read()
                 arxiv_dict[number_id]["text"] = paper_text
@@ -162,19 +209,28 @@ def convert_tex(
                     f.write(main_doc)
                 return
             else:
-                os.chdir(paper_dir)
-                list_of_tex_files = [doc for doc in ls(".") if doc.endswith(".tex")]
+                os.chdir(paper_dir_full)
+                list_of_tex_files = [
+                    doc.split("/")[-1] for doc in ls(".") if doc.endswith(".tex")
+                ]
                 # if items in list_of_tex_files are in filenames_to_ignore, remove them
                 matched_list = [
                     doc
                     for doc in list_of_tex_files
-                    if doc.split("/")[-1].lower() not in filenames_to_ignore
+                    if doc.lower() not in filenames_to_ignore
                 ]
                 print(matched_list)
                 if len(matched_list) == 1:
                     main_doc = matched_list[0]
                     # change to that directory and use the common file name
-                    sh(f"timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none")
+                    sh(
+                        f"if ! timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none; then touch {paper_id}_pandoc_failed; fi"
+                    )
+                    if os.path.exists(f"{paper_id}_pandoc_failed"):
+                        print(f"{paper_id} failed to convert with pandoc.")
+                        os.chdir(project_dir)
+                        sh(f"mv -f {paper_dir} errored/pandoc_failures/")
+                        return
                     with open(f"{paper_id}.md", "r") as f:
                         paper_text = f.read()
                     arxiv_dict[number_id]["text"] = paper_text
@@ -191,7 +247,14 @@ def convert_tex(
                     # if main file was stored in arxiv_dict, use it
                     # arxiv_dict is created when we need to use convert_tex_semiauto and manually inputting main tex filename
                     main_tex = arxiv_dict[number_id]["main_tex_filename"]
-                    sh(f"timeout 7s pandoc -s {main_tex} -o {paper_id}.md --wrap=none")
+                    sh(
+                        f"if ! timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none; then touch {paper_id}_pandoc_failed; fi"
+                    )
+                    if os.path.exists(f"{paper_id}_pandoc_failed"):
+                        print(f"{paper_id} failed to convert with pandoc.")
+                        os.chdir(project_dir)
+                        sh(f"mv -f {paper_dir} errored/pandoc_failures/")
+                        return
                     with open(f"{paper_id}.md", "r") as f:
                         paper_text = f.read()
                     arxiv_dict[number_id]["text"] = paper_text
@@ -207,7 +270,7 @@ def convert_tex(
                         f"{paper_id} main filename not found in main_tex_dict, sending to fallback_needed"
                     )
                     os.chdir(project_dir)
-                    sh(f"mv {paper_dir} fallback_needed")
+                    sh(f"mv -f {paper_dir} fallback_needed/unknown_main_tex/")
                     return
 
     except:
@@ -220,7 +283,10 @@ def convert_tex(
             print("Error converting paper. Moving to fallback pile...")
             os.chdir(project_dir)
             print(f"Error: Current directory: {os.getcwd()}")
-            sh(f"mv -f {paper_dir} fallback_needed")
+            if os.path.exists(f"{paper_dir}_pandoc_failure"):
+                sh(f"mv -f {paper_dir} errored/pandoc_failures/")
+            else:
+                sh(f"mv -f {paper_dir} errored/unknown_errors/")
             pass
         except:
             traceback.print_exc()
@@ -261,10 +327,10 @@ def convert_tex_semiauto(rootdir="tmp", paper_id=None, arxiv_dict=None):
                     sh(f"timeout 7s pandoc -s {doc}.tex -o {paper_id}.md --wrap=none")
                     break
         if not main_match:
-            tmp_contents = os.listdir()
+            paper_dir_contents = os.listdir()
             num_tex_files = 0
             print(os.listdir())
-            for doc in tmp_contents:
+            for doc in paper_dir_contents:
                 if doc.endswith(".tex"):
                     num_tex_files += 1
                     tex_doc = doc

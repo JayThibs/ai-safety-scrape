@@ -14,7 +14,10 @@ import traceback
 
 
 sh(
-    "mkdir -p tmp out done fallback_needed outtxt errored && rm -rf fallback_needed/* && rm -rf out/* && rm -rf error_log.txt"
+    "mkdir -p tmp out outtxt errored fallback_needed && rm -rf fallback_needed/* && rm -rf out/* && rm -rf error_log.txt && rm -rf errored/*"
+)
+sh(
+    "mkdir -p fallback_needed/unknown_main_tex fallback_needed/pdf_only errored/pandoc_failures errored/unknown_errors"
 )
 files = ls("files")
 ignore_filenames = pd.read_csv("ignore_filenames.csv").values
@@ -132,7 +135,7 @@ if __name__ == "__main__":
     paper_folders = ls("tmp")
     pool.close()
     pool.join()
-    for i, paper_folder in enumerate(tqdm(paper_folders[0:30])):
+    for i, paper_folder in enumerate(tqdm(paper_folders)):
         print(f"{i}/{len(paper_folders)}")
         try:
             print(f"preparing {paper_folder}")
@@ -142,7 +145,7 @@ if __name__ == "__main__":
         except ExitCodeError:
             traceback.print_exc()
             print(f"Error converting {paper_folder}")
-            sh(f"mv {paper_folder} fallback_needed")
+            sh(f"mv {paper_folder} errored/unknown_errors")
 
     # with mp.Manager() as manager:
     #     d = manager.dict()
