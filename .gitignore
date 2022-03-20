@@ -8,6 +8,11 @@ fallback_needed/
 files/
 out/
 outtxt/
+data/
+*.json
+*.pkl
+*.tex
+*.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
