@@ -48,6 +48,7 @@ ignore_list_title = [
     "Metrics",
     "Train",
     "Defs",
+    "Defn",
     "Comments",
     "Acknowledgements",
     "Analysis",
