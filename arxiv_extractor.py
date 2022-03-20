@@ -42,7 +42,6 @@ def fix_chars_in_dirs(paper_dir_path):
     os.chdir(paper_dir_path)
     print(f"fixing {paper_dir_path}")
     for doc in ls("."):
-        print(doc)
         if os.path.isdir(doc):
             new_doc_name = doc.translate(
                 {ord(c): "_" for c in " !@#$%^&*()[]{};:,<>?\|`~-=+"}
@@ -60,50 +59,52 @@ def prepare_extracted_tars(paper_dir_path):
     try:
         # load arxiv_citations_dict json to add citations to paper_id
         arxiv_citations_dict = json.load(open("arxiv_citations_dict.json"))
-        for doc in lsr(paper_dir_path):
-            # print(doc)
-            try:
+        try:
+            for doc in lsr(paper_dir_path):
                 if doc.endswith(".gz"):
                     sh(f"gunzip {doc}")
-                    type = mime.from_file(doc[:-3])
-                    if type == "application/x-tar":
-                        # if tarfile, extract in {doc[:-3]}_extract folder and delete tarfile
-                        sh(
-                            f"mkdir -p {doc[:-3]}_extract && tar xf {doc[:-3]} -C {doc[:-3]}_extract"
-                        )
-                        sh(f"rm {doc[:-3]}")
-                    elif type == "text/x-tex":
-                        # if tex, keep it
-                        pass
-                    elif type == "application/x-bbl":
-                        # if bbl, keep it
-                        pass
-                    else:
-                        # if not tar or tex, delete file
-                        sh(f"rm {doc[:-3]}")
-
-                elif doc.endswith(".tex"):
+            for doc in lsr(paper_dir_path):
+                if doc.endswith(".tar"):
+                    # if tarfile, extract in {doc[:-3]}_extract folder and delete tarfile
+                    sh(
+                        f"mkdir -p {doc[:-3]}_extract && tar xf {doc[:-3]} -C {doc[:-3]}_extract"
+                    )
+                    sh(f"rm {doc[:-3]}")
+        except:
+            pass
+        for doc in lsr(paper_dir_path):
+            try:
+                if doc.endswith(".tex"):
                     # if tex, do nothing and keep it
                     pass
 
                 elif doc.endswith(".bbl") or doc.endswith(".bib"):
                     # if bbl, extract arxiv ids from citations, add to list, and delete bbl
                     arxiv_citations, bibliography = get_arxiv_ids(doc)
-                    for arxiv_id in arxiv_citations:
-                        if arxiv_citations_dict.get(paper_id) is None:
-                            arxiv_citations_dict[paper_id] = {arxiv_id: True}
-                        else:
-                            arxiv_citations_dict[paper_id].update({arxiv_id: True})
-                    json.dump(
-                        arxiv_citations_dict, open("arxiv_citations_dict.json", "w")
-                    )
-                    id = paper_id.split("v")[0]  # remove version number
-                    arxiv_dict[id]["arxiv_citations"] = arxiv_citations_dict[paper_id]
+                    if len(arxiv_citations) > 0:
+                        for arxiv_id in arxiv_citations:
+                            if arxiv_citations_dict.get(paper_id) is None:
+                                arxiv_citations_dict[paper_id] = {arxiv_id: True}
+                            else:
+                                arxiv_citations_dict[paper_id].update({arxiv_id: True})
+                        json.dump(
+                            arxiv_citations_dict, open("arxiv_citations_dict.json", "w")
+                        )
+                        id = paper_id.split("v")[0]  # remove version number
+                        arxiv_dict[id]["arxiv_citations"] = arxiv_citations_dict[
+                            paper_id
+                        ]
                     if doc.endswith(".bbl"):
                         arxiv_dict[id]["bibliography_bbl"] = bibliography
                     elif doc.endswith(".bib"):
                         arxiv_dict[id]["bibliography_bib"] = bibliography
                     json.dump(arxiv_dict, open("arxiv_dict.json", "w"))
+
+                elif doc.endswith(".sty"):
+                    # if sty, delete it since it causes issues with pandoc
+                    # this file is a LaTeX Style document
+                    # (commonly used for formatting for a specific journal/conference)
+                    sh(f"rm {doc}")
 
                 else:
                     pass
@@ -128,13 +129,11 @@ def main_convert(paper_dir_path):
 
 if __name__ == "__main__":
 
-    print(arxiv_dict["1310.4546"])
-    # print(arxiv_dict["1202.6177"])
     paper_tars = ls("files")
     pool.map(preextract_tar, paper_tars)
-    paper_folders = ls("tmp")
     pool.close()
     pool.join()
+    paper_folders = ls("tmp")
     for i, paper_folder in enumerate(tqdm(paper_folders)):
         print(f"{i}/{len(paper_folders)}")
         try:
