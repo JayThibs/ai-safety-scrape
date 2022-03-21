@@ -13,12 +13,11 @@ import pandas as pd
 import traceback
 
 
-sh(
-    "mkdir -p tmp out outtxt errored fallback_needed && rm -rf fallback_needed/* && rm -rf out/* && rm -rf error_log.txt && rm -rf errored/*"
-)
+sh("mkdir -p tmp out outtxt errored fallback_needed")
 sh(
     "mkdir -p fallback_needed/unknown_main_tex fallback_needed/pdf_only errored/pandoc_failures errored/unknown_errors"
 )
+sh("rm -rf tmp/.DS_Store ||:")
 files = ls("files")
 ignore_filenames = pd.read_csv("ignore_filenames.csv").values
 arxiv_citations_list = []
@@ -78,6 +77,12 @@ def prepare_extracted_tars(paper_dir_path):
                     # if tex, do nothing and keep it
                     pass
 
+                elif doc.endswith(".sty"):
+                    # if sty, delete it since it causes issues with pandoc
+                    # this file is a LaTeX Style document
+                    # (commonly used for formatting for a specific journal/conference)
+                    sh(f"rm {doc}")
+
                 elif doc.endswith(".bbl") or doc.endswith(".bib"):
                     # if bbl, extract arxiv ids from citations, add to list, and delete bbl
                     arxiv_citations, bibliography = get_arxiv_ids(doc)
@@ -100,10 +105,17 @@ def prepare_extracted_tars(paper_dir_path):
                         arxiv_dict[id]["bibliography_bib"] = bibliography
                     json.dump(arxiv_dict, open("arxiv_dict.json", "w"))
 
-                elif doc.endswith(".sty"):
-                    # if sty, delete it since it causes issues with pandoc
-                    # this file is a LaTeX Style document
-                    # (commonly used for formatting for a specific journal/conference)
+                # check if filename has no extension, this is likely a .tex file
+                # if so, add .tex to the filename
+                # these files are typically named with the arxiv id (e.g. 1801.01234)
+                elif re.findall(
+                    r"(\d{4}\.\d{4,5})", doc.split("/")[-1]
+                ) != [] and not doc.endswith(".pdf"):
+                    # add .tex to filename
+                    sh(f"mv {doc} {doc}.tex")
+
+                elif doc.endswith(".DS_Store"):
+                    # delete .DS_Store files
                     sh(f"rm {doc}")
 
                 else:
@@ -118,6 +130,13 @@ def prepare_extracted_tars(paper_dir_path):
         print(f"Error deleting files in {paper_id}")
 
 
+def delete_style_files(paper_dir_path):
+    # delete all files with .sty extension
+    for doc in lsr(paper_dir_path):
+        if doc.endswith(".sty"):
+            sh(f"rm {doc}")
+
+
 def main_convert(paper_dir_path):
     for i in range(len(files)):
         print(f"{i}/{len(files)}")
@@ -129,22 +148,53 @@ def main_convert(paper_dir_path):
 
 if __name__ == "__main__":
 
+    # Automatic Mode will go through all the papers in files and try
+    # to convert them to markdown.
+    # Non-automatic mode will go through the errored papers one by one and
+    # ask the use to fix the error in the tex file to fix the conversion error.
+    automatic_mode = input("Automatic mode? (y/n): ")
+    if automatic_mode == "y":
+        automatic_mode = True
+    else:
+        automatic_mode = False
     paper_tars = ls("files")
     pool.map(preextract_tar, paper_tars)
     pool.close()
     pool.join()
     paper_folders = ls("tmp")
-    for i, paper_folder in enumerate(tqdm(paper_folders)):
-        print(f"{i}/{len(paper_folders)}")
-        try:
-            print(f"preparing {paper_folder}")
-            fix_chars_in_dirs(paper_folder)
-            prepare_extracted_tars(paper_folder)
-            convert_tex(paper_dir=paper_folder, arxiv_dict=arxiv_dict)
-        except ExitCodeError:
-            traceback.print_exc()
-            print(f"Error converting {paper_folder}")
-            sh(f"mv {paper_folder} errored/unknown_errors")
+
+    if automatic_mode:
+        for i, paper_folder in enumerate(tqdm(paper_folders)):
+            print(f"{i}/{len(paper_folders)}")
+            try:
+                print(f"preparing {paper_folder}")
+                fix_chars_in_dirs(paper_folder)
+                prepare_extracted_tars(paper_folder)
+                delete_style_files(
+                    paper_folder
+                )  # putting this here too to make sure they are deleted
+                convert_tex(paper_dir=paper_folder, arxiv_dict=arxiv_dict)
+            except ExitCodeError:
+                traceback.print_exc()
+                print(f"Error converting {paper_folder}")
+                sh(f"mv {paper_folder} errored/unknown_errors")
+
+    # for paper_folder in ls("tmp"):
+    #     if os.path.isdir(paper_folder):
+    #         sh(f"mv {paper_folder} done")
+
+    for paper_folder in ls("errored/pandoc_failures"):
+        if os.path.isdir(paper_folder):
+            sh(f"mv {paper_folder} tmp")
+
+    if not automatic_mode:
+        pandoc_failures = ls("tmp")
+        for i, paper_folder in enumerate(tqdm(pandoc_failures)):
+            try:
+                print(f'Converting errored papers: "{paper_folder}"')
+                convert_tex_manual(paper_dir=paper_folder, arxiv_dict=arxiv_dict)
+            except ExitCodeError:
+                traceback.print_exc()
 
     # with mp.Manager() as manager:
     #     d = manager.dict()
