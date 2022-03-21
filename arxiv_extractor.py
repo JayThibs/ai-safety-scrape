@@ -174,10 +174,10 @@ if __name__ == "__main__":
                     paper_folder
                 )  # putting this here too to make sure they are deleted
                 convert_tex(paper_dir=paper_folder, arxiv_dict=arxiv_dict)
+                sh(f"mv {paper_folder} done")
             except ExitCodeError:
                 traceback.print_exc()
                 print(f"Error converting {paper_folder}")
-                sh(f"mv {paper_folder} errored/unknown_errors")
 
     # for paper_folder in ls("tmp"):
     #     if os.path.isdir(paper_folder):
@@ -185,7 +185,16 @@ if __name__ == "__main__":
 
     for paper_folder in ls("errored/pandoc_failures"):
         if os.path.isdir(paper_folder):
+            for file in ls(paper_folder):
+                if file.endswith("_failed"):
+                    sh(f"rm {file}")
             sh(f"mv {paper_folder} tmp")
+
+    for paper_folder in ls("tmp"):
+        if os.path.isdir(paper_folder):
+            for file in ls(paper_folder):
+                if file.endswith("_failed"):
+                    sh(f"rm {file}")
 
     if not automatic_mode:
         pandoc_failures = ls("tmp")
