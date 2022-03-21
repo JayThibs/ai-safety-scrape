@@ -92,6 +92,7 @@ def convert_tex(
     arxiv_dict,
     output_dir="out",
     main_tex_output_dir="outtxt",
+    manual_conversion=False,
 ):
     """
     Converts paper tex file automatically. Sends errors to fallback_needed for conversion with convert_tex_semiauto.
@@ -103,6 +104,7 @@ def convert_tex(
         paper_id = paper_dir.split("/")[-1]
         if os.path.exists(f"{output_dir}/{paper_id}.md"):
             print(f"{paper_id}.md already exists.")
+            sh(f"mv {paper_dir} done")
             return
         os.chdir(paper_dir)
         paper_dir_full = os.getcwd()
@@ -144,7 +146,8 @@ def convert_tex(
             if os.path.exists(f"{paper_id}_pandoc_failed"):
                 print(f"{paper_id} failed to convert with pandoc.")
                 os.chdir(project_dir)
-                sh(f"mv -f {paper_dir} errored/pandoc_failures/")
+                if not manual_conversion:
+                    sh(f"mv -f {paper_dir} errored/pandoc_failures/")
                 return
             with open(f"{paper_id}.md", "r") as f:
                 paper_text = f.read()
@@ -195,7 +198,8 @@ def convert_tex(
                 if os.path.exists(f"{paper_id}_pandoc_failed"):
                     print(f"{paper_id} failed to convert with pandoc.")
                     os.chdir(project_dir)
-                    sh(f"mv -f {paper_dir} errored/pandoc_failures/")
+                    if not manual_conversion:
+                        sh(f"mv -f {paper_dir} errored/pandoc_failures/")
                     return
                 with open(f"{paper_id}.md", "r") as f:
                     paper_text = f.read()
@@ -229,7 +233,8 @@ def convert_tex(
                     if os.path.exists(f"{paper_id}_pandoc_failed"):
                         print(f"{paper_id} failed to convert with pandoc.")
                         os.chdir(project_dir)
-                        sh(f"mv -f {paper_dir} errored/pandoc_failures/")
+                        if not manual_conversion:
+                            sh(f"mv -f {paper_dir} errored/pandoc_failures/")
                         return
                     with open(f"{paper_id}.md", "r") as f:
                         paper_text = f.read()
@@ -253,7 +258,8 @@ def convert_tex(
                     if os.path.exists(f"{paper_id}_pandoc_failed"):
                         print(f"{paper_id} failed to convert with pandoc.")
                         os.chdir(project_dir)
-                        sh(f"mv -f {paper_dir} errored/pandoc_failures/")
+                        if not manual_conversion:
+                            sh(f"mv -f {paper_dir} errored/pandoc_failures/")
                         return
                     with open(f"{paper_id}.md", "r") as f:
                         paper_text = f.read()
@@ -276,106 +282,53 @@ def convert_tex(
     except:
         try:
             traceback.print_exc()
-            with open(f"error_log.txt", "a") as f:
-                f.write(f"{traceback.format_exc()}")
-            with open(f"{project_dir}/error_log.txt", "a") as f:
-                f.write(f"{paper_id}\n {traceback.format_exc()}\n")
-            print("Error converting paper. Moving to fallback pile...")
-            os.chdir(project_dir)
-            print(f"Error: Current directory: {os.getcwd()}")
-            if os.path.exists(f"{paper_dir}_pandoc_failure"):
-                sh(f"mv -f {paper_dir} errored/pandoc_failures/")
-            else:
-                sh(f"mv -f {paper_dir} errored/unknown_errors/")
-            pass
+            if not manual_conversion:
+                with open(f"error_log.txt", "a") as f:
+                    f.write(f"{traceback.format_exc()}")
+                with open(f"{project_dir}/error_log.txt", "a") as f:
+                    f.write(f"{paper_id}\n {traceback.format_exc()}\n")
+                print("Error converting paper. Moving to fallback pile...")
+                os.chdir(project_dir)
+                print(f"Error: Current directory: {os.getcwd()}")
+                if os.path.exists(f"{paper_dir}_pandoc_failure"):
+                    sh(f"mv -f {paper_dir} errored/pandoc_failures/")
+                else:
+                    sh(f"mv -f {paper_dir} errored/unknown_errors/")
+                pass
         except:
             traceback.print_exc()
             print("Error moving paper to fallback pile.")
             pass
 
 
-def convert_tex_semiauto(rootdir="tmp", paper_id=None, arxiv_dict=None):
+def convert_tex_manual(paper_dir, arxiv_dict):
     """
-    Converts paper tex files semi-automatically. If there are multiple tex files,
-    it will check for a list of common "main" file names and use the first one found.
-    If there are multiple .tex files and it cannot find a main file, you will be prompted
-    to select one.
+    Puts papers from fallback_needed/pandoc_failures in a queue to be
+    converted with convert_tex_manual. This function is run when pandoc fails
+    to convert a paper. This is typically because of some missing braces or brackets
+    in the tex file. You will need to go into the main tex file and manually
+    fix the issue in the file. convert_tex will be ran once in order to show you
+    the error so that it's a bit clearer what you need to fix.
+    Then, click enter in the terminal to continue.
     """
-    print('Changing current directory to "tmp"...')
-    os.chdir(rootdir)
-    main_match = False
-    print("Current directory: " + os.getcwd())
-    print("paper_id: " + paper_id)
-
-    try:
-        assert len(ls(".")) > 0
-        convert_to_utf8(rotdir=".")
-        if len(ls(".")) == 1:
-            # if there is only one tex file, just convert it
-            main_match = True
-            doc = ls(".")[0].split("/")[-1]
-            sh(f"timeout 7s pandoc -s {doc} -o {paper_id}.md --wrap=none")
-        else:
-            # if there are multiple tex files,
-            # check for the main file based on a common list of names
-            for doc in ls("."):
-                doc = doc.split("/")[-1][:-4]
-                # print(doc)
-                if doc in main_tex_name_list:
-                    # if there is a common main file name, use it
-                    main_match = True
-                    sh(f"timeout 7s pandoc -s {doc}.tex -o {paper_id}.md --wrap=none")
-                    break
-        if not main_match:
-            paper_dir_contents = os.listdir()
-            num_tex_files = 0
-            print(os.listdir())
-            for doc in paper_dir_contents:
-                if doc.endswith(".tex"):
-                    num_tex_files += 1
-                    tex_doc = doc
-            if num_tex_files == 1:
-                # if there is only one tex file, use it
-                sh(f"timeout 7s pandoc -s {tex_doc} -o {paper_id}.md --wrap=none")
-            else:
-                if paper_id in arxiv_dict:
-                    # if main file was stored in main_tex_dict, use it
-                    main_tex = arxiv_dict[paper_id]
-                else:
-                    # if there are multiple tex files
-                    # and it's not in the above list: prompt user to select one
-                    print("Multiple tex files found. Please select the main file: ")
-                    main_tex = str(
-                        input(
-                            f"Enter the main .tex filename here, file extension included (e.g. AIProgress.tex): "
-                        )
-                    )
-                    arxiv_dict[paper_id] = main_tex
-                    os.chdir("..")
-                    json.dump(arxiv_dict, open("main_tex_dict.json", "w"))
-                    os.chdir(rootdir)
-
-                sh(f"timeout 7s pandoc -s {main_tex} -o {paper_id}.md --wrap=none")
-
-        os.chdir("..")
-        print("Current directory: " + os.getcwd())
-        sh(f"mv tmp/{paper_id}.md out/{paper_id}.md")
-
-    except:
-        traceback.print_exc()
-        print("Error converting paper. Moving to fallback pile...")
-        if os.getcwd().split("/")[-1] == "tmp":
-            os.chdir("..")
-        # fallback:
+    fixed_error = False
+    while fixed_error == False:
         try:
-            # move to fallback pile so we can handle it later
-            sh(
-                f"mkdir -p fallback_needed/{paper_id} && mv tmp/* fallback_needed/{paper_id}/"
-            )
-        except ExitCodeError:
+            convert_tex(paper_dir, arxiv_dict, manual_conversion=True)
+        except:
+            print("Error converting the paper. Please fix the error in the tex file.")
             traceback.print_exc()
+            pass
 
-        assert os.path.exists(f"out/{paper_id}.md")  # to send tar to errored pile
+        print("Was the error fixed? (y/n)")
+        answer = input()
+        if answer == "y":
+            fixed_error = True
+            break
+        else:
+            print("Please fix the error in the main tex file and then click enter.")
+            input()
+            continue
 
 
 def get_arxiv_ids(bib_file_path):
