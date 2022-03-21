@@ -337,8 +337,12 @@ def convert_tex_manual(paper_dir, arxiv_dict):
     Then, click enter in the terminal to continue.
     """
     fixed_error = False
+    project_dir = os.getcwd()
+    paper_id = paper_dir.split("/")[-1]
     while fixed_error == False:
         try:
+            os.chdir(project_dir)
+            sh(f"rm -f {paper_id}_pandoc_failed")
             main_doc = convert_tex(paper_dir, arxiv_dict, manual_conversion=True)
         except:
             print("Error converting the paper. Please fix the error in the tex file.")
@@ -351,7 +355,9 @@ def convert_tex_manual(paper_dir, arxiv_dict):
             fixed_error = True
             break
         else:
-            print(f"Opening {main_doc} in text editor. Please fix the error.")
+            print(
+                f"Opening {main_doc} in text editor. Please fix the error. Save and close the file once you are done."
+            )
             sh(f"open {main_doc}")
             input("Press enter once you have fixed the error and fixed the tex file.")
             continue
