@@ -143,26 +143,29 @@ def convert_tex(
             sh(
                 f"if ! timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none; then touch {paper_id}_pandoc_failed; fi"
             )
-            if os.path.exists(f"{paper_id}_pandoc_failed"):
+            if os.path.exists(f"{paper_id}_pandoc_failed") and not manual_conversion:
                 print(f"{paper_id} failed to convert with pandoc.")
                 os.chdir(project_dir)
                 if not manual_conversion:
                     sh(f"mv -f {paper_dir} errored/pandoc_failures/")
                 return
-            with open(f"{paper_id}.md", "r") as f:
-                paper_text = f.read()
-            arxiv_dict[number_id]["text"] = paper_text
-            arxiv_dict[number_id]["main_tex_filename"] = main_doc
-            json.dump(arxiv_dict, open(f"{project_dir}/arxiv_dict.json", "w"))
-            os.chdir(project_dir)
-            sh(f"mv {paper_dir}/{paper_id}.md {output_dir}/{paper_id}.md")
-            # TODO: there's a better way to do this, but to make multiprocessing work,
-            # I'm going to create a .txt file for each paper and store the main_tex_name in it.
-            # This is a hacky way to do it, but it works. Once the extraction is done,
-            # we can use the .txt file to get the main_tex_name and store it in the arxiv_dict.
-            with open(f"{main_tex_output_dir}/{paper_id}.txt", "w") as f:
-                f.write(main_doc)
-            return
+            if not manual_conversion:
+                with open(f"{paper_id}.md", "r") as f:
+                    paper_text = f.read()
+                arxiv_dict[number_id]["text"] = paper_text
+                arxiv_dict[number_id]["main_tex_filename"] = main_doc
+                json.dump(arxiv_dict, open(f"{project_dir}/arxiv_dict.json", "w"))
+                os.chdir(project_dir)
+                sh(f"mv {paper_dir}/{paper_id}.md {output_dir}/{paper_id}.md")
+                # TODO: there's a better way to do this, but to make multiprocessing work,
+                # I'm going to create a .txt file for each paper and store the main_tex_name in it.
+                # This is a hacky way to do it, but it works. Once the extraction is done,
+                # we can use the .txt file to get the main_tex_name and store it in the arxiv_dict.
+                with open(f"{main_tex_output_dir}/{paper_id}.txt", "w") as f:
+                    f.write(main_doc)
+                return
+            else:
+                return main_doc
         else:
             # if there are multiple tex files,
             # check for the main file based on a common list of names
@@ -195,23 +198,29 @@ def convert_tex(
                 sh(
                     f"if ! timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none; then touch {paper_id}_pandoc_failed; fi"
                 )
-                if os.path.exists(f"{paper_id}_pandoc_failed"):
+                if (
+                    os.path.exists(f"{paper_id}_pandoc_failed")
+                    and not manual_conversion
+                ):
                     print(f"{paper_id} failed to convert with pandoc.")
                     os.chdir(project_dir)
                     if not manual_conversion:
                         sh(f"mv -f {paper_dir} errored/pandoc_failures/")
                     return
-                with open(f"{paper_id}.md", "r") as f:
-                    paper_text = f.read()
-                arxiv_dict[number_id]["text"] = paper_text
-                arxiv_dict[number_id]["main_tex_filename"] = main_doc
-                json.dump(arxiv_dict, open(f"{project_dir}/arxiv_dict.json", "w"))
-                # go back to root
-                os.chdir(project_dir)
-                sh(f"mv {paper_dir}/{paper_id}.md {output_dir}/{paper_id}.md")
-                with open(f"{main_tex_output_dir}/{paper_id}.txt", "w") as f:
-                    f.write(main_doc)
-                return
+                if not manual_conversion:
+                    with open(f"{paper_id}.md", "r") as f:
+                        paper_text = f.read()
+                    arxiv_dict[number_id]["text"] = paper_text
+                    arxiv_dict[number_id]["main_tex_filename"] = main_doc
+                    json.dump(arxiv_dict, open(f"{project_dir}/arxiv_dict.json", "w"))
+                    # go back to root
+                    os.chdir(project_dir)
+                    sh(f"mv {paper_dir}/{paper_id}.md {output_dir}/{paper_id}.md")
+                    with open(f"{main_tex_output_dir}/{paper_id}.txt", "w") as f:
+                        f.write(main_doc)
+                    return
+                else:
+                    return main_doc
             else:
                 os.chdir(paper_dir_full)
                 list_of_tex_files = [
@@ -230,23 +239,31 @@ def convert_tex(
                     sh(
                         f"if ! timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none; then touch {paper_id}_pandoc_failed; fi"
                     )
-                    if os.path.exists(f"{paper_id}_pandoc_failed"):
+                    if (
+                        os.path.exists(f"{paper_id}_pandoc_failed")
+                        and not manual_conversion
+                    ):
                         print(f"{paper_id} failed to convert with pandoc.")
                         os.chdir(project_dir)
                         if not manual_conversion:
                             sh(f"mv -f {paper_dir} errored/pandoc_failures/")
                         return
-                    with open(f"{paper_id}.md", "r") as f:
-                        paper_text = f.read()
-                    arxiv_dict[number_id]["text"] = paper_text
-                    arxiv_dict[number_id]["main_tex_filename"] = main_doc
-                    json.dump(arxiv_dict, open(f"{project_dir}/arxiv_dict.json", "w"))
-                    # go back to root
-                    os.chdir(project_dir)
-                    sh(f"mv {paper_dir}/{paper_id}.md {output_dir}/{paper_id}.md")
-                    with open(f"{main_tex_output_dir}/{paper_id}.txt", "w") as f:
-                        f.write(main_doc)
-                    return
+                    if not manual_conversion:
+                        with open(f"{paper_id}.md", "r") as f:
+                            paper_text = f.read()
+                        arxiv_dict[number_id]["text"] = paper_text
+                        arxiv_dict[number_id]["main_tex_filename"] = main_doc
+                        json.dump(
+                            arxiv_dict, open(f"{project_dir}/arxiv_dict.json", "w")
+                        )
+                        # go back to root
+                        os.chdir(project_dir)
+                        sh(f"mv {paper_dir}/{paper_id}.md {output_dir}/{paper_id}.md")
+                        with open(f"{main_tex_output_dir}/{paper_id}.txt", "w") as f:
+                            f.write(main_doc)
+                        return
+                    else:
+                        return main_doc
 
                 if arxiv_dict[number_id]["main_tex_filename"] != "":
                     # if main file was stored in arxiv_dict, use it
@@ -255,19 +272,27 @@ def convert_tex(
                     sh(
                         f"if ! timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none; then touch {paper_id}_pandoc_failed; fi"
                     )
-                    if os.path.exists(f"{paper_id}_pandoc_failed"):
+                    if (
+                        os.path.exists(f"{paper_id}_pandoc_failed")
+                        and not manual_conversion
+                    ):
                         print(f"{paper_id} failed to convert with pandoc.")
                         os.chdir(project_dir)
                         if not manual_conversion:
                             sh(f"mv -f {paper_dir} errored/pandoc_failures/")
                         return
-                    with open(f"{paper_id}.md", "r") as f:
-                        paper_text = f.read()
-                    arxiv_dict[number_id]["text"] = paper_text
-                    json.dump(arxiv_dict, open(f"{project_dir}/arxiv_dict.json", "w"))
-                    os.chdir(project_dir)
-                    sh(f"mv {paper_dir}/{paper_id}.md out/{paper_id}.md")
-                    return
+                    if not manual_conversion:
+                        with open(f"{paper_id}.md", "r") as f:
+                            paper_text = f.read()
+                        arxiv_dict[number_id]["text"] = paper_text
+                        json.dump(
+                            arxiv_dict, open(f"{project_dir}/arxiv_dict.json", "w")
+                        )
+                        os.chdir(project_dir)
+                        sh(f"mv {paper_dir}/{paper_id}.md out/{paper_id}.md")
+                        return
+                    else:
+                        return main_tex
                 else:
                     # can't find main file, so send to fallback_needed for manual conversion with convert_tex_semiauto
                     # it's useful to do it this way because then you can go through the fallback_needed folder and
@@ -314,7 +339,7 @@ def convert_tex_manual(paper_dir, arxiv_dict):
     fixed_error = False
     while fixed_error == False:
         try:
-            convert_tex(paper_dir, arxiv_dict, manual_conversion=True)
+            main_doc = convert_tex(paper_dir, arxiv_dict, manual_conversion=True)
         except:
             print("Error converting the paper. Please fix the error in the tex file.")
             traceback.print_exc()
@@ -326,8 +351,9 @@ def convert_tex_manual(paper_dir, arxiv_dict):
             fixed_error = True
             break
         else:
-            print("Please fix the error in the main tex file and then click enter.")
-            input()
+            print(f"Opening {main_doc} in text editor. Please fix the error.")
+            sh(f"open {main_doc}")
+            input("Press enter once you have fixed the error and fixed the tex file.")
             continue
 
 
