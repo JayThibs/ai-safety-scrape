@@ -9,6 +9,7 @@ import pickle
 from urllib.error import HTTPError
 import json
 from utils import *
+from tqdm import tqdm
 
 
 RAW_DIR = Path("data/raw")
@@ -52,7 +53,7 @@ def download_arxiv_paper_tars(
     incorrect_links_ids = []
     paper_dl_failures = []
     arxiv_dict = {}
-    for i, (paper_link, filename) in enumerate(zip(papers, tars)):
+    for i, (paper_link, filename) in enumerate(tqdm(zip(papers, tars))):
         paper_id = ".".join(filename.split(".")[:2])
 
         if os.path.exists(str(TARS_DIR / filename)) and create_dict_only == False:
@@ -95,9 +96,9 @@ def download_arxiv_paper_tars(
 
         try:
             paper.download_source(dirpath=str(TARS_DIR), filename=tar_filename)
-            print("Downloaded paper: " + paper_id)
+            print("; Downloaded paper: " + paper_id)
         except HTTPError:
-            print("Could not download paper: " + paper_id)
+            print("; Could not download paper: " + paper_id)
             paper_dl_failures.append(paper_id)
             pass
 
