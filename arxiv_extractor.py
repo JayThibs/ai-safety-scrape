@@ -169,12 +169,6 @@ def main_convert(paper_dir_path):
 
 if __name__ == "__main__":
 
-    # Delete contents before starting?
-    # This is useful when you are testing and want to start from scratch
-    delete_contents = input("Delete data before starting? (y/n) ")
-    if delete_contents == "y":
-        sh("rm -rf tmp/* out/* outtxt/* files/*")
-
     # Automatic Mode will go through all the papers in files and try
     # to convert them to markdown.
     # Non-automatic mode will go through the errored papers one by one and
@@ -190,6 +184,12 @@ if __name__ == "__main__":
                 "Citation level? (0 = original, 1 = citation of original, 2 = citation of citation, etc.): "
             )
         )
+        if citation_level == 0:
+            # Delete contents before starting?
+            # This is useful when you are testing and want to start from scratch
+            delete_contents = input("Delete data before starting? (y/n) ")
+            if delete_contents == "y":
+                sh("rm -rf tmp/* out/* outtxt/* files/*")
         download_arxiv_paper_tars(citation_level=citation_level)
         sh(f"mv {TARS_DIR}/* files/")
         paper_tars = ls("files")
@@ -214,11 +214,10 @@ if __name__ == "__main__":
                 traceback.print_exc()
                 print(f"Error converting {paper_folder}")
 
+    if not automatic_mode:
         for paper_folder in ls("errored/pandoc_failures"):
             if os.path.isdir(paper_folder):
                 sh(f"mv {paper_folder} tmp")
-
-    if not automatic_mode:
         pandoc_failures = ls("tmp")
         for paper_folder in pandoc_failures:
             if os.path.isdir(paper_folder):
