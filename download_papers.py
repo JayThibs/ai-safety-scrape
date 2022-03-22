@@ -50,7 +50,7 @@ def download_arxiv_paper_tars(
     incorrect_links_ids = []
     paper_dl_failures = []
     arxiv_dict = {}
-    for i, (paper_link, filename) in enumerate(zip(papers[0:10], tars[0:10])):
+    for i, (paper_link, filename) in enumerate(zip(papers, tars)):
         paper_id = ".".join(filename.split(".")[:2])
 
         if os.path.exists(str(TARS_DIR / filename)) and create_dict_only == False:
