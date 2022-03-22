@@ -57,20 +57,18 @@ else:
 pool = mp.Pool(processes=mp.cpu_count())
 
 
-def fix_chars_in_dirs(paper_dir_path):
-    # replace special characters in directories with underscores
-    os.chdir(paper_dir_path)
-    print(f"fixing {paper_dir_path}")
-    for doc in ls("."):
-        if os.path.isdir(doc):
-            new_doc_name = doc.translate(
+def fix_chars_in_dirs(parent):
+    for path, folders, files in os.walk(parent):
+        for f in files:
+            os.rename(os.path.join(path, f), os.path.join(path, f.replace(" ", "_")))
+        for folder in folders:
+            new_folder_name = folder.translate(
                 {ord(c): "_" for c in " !@#$%^&*()[]{};:,<>?\|`~-=+"}
             )
-            if new_doc_name != doc:
-                os.rename(doc, new_doc_name)
-
-    chdir_up_n(2)
-    print(f"finished fixing {paper_dir_path}")
+            if new_folder_name != folder:
+                os.rename(
+                    os.path.join(path, folder), os.path.join(path, new_folder_name)
+                )
 
 
 def prepare_extracted_tars(paper_dir_path):
@@ -210,6 +208,8 @@ if __name__ == "__main__":
                 delete_style_files(
                     paper_folder
                 )  # putting this here too to make sure they are deleted
+                if paper_folder == "tmp/1801.08757v1":
+                    print("here")
                 convert_tex(paper_dir=paper_folder, arxiv_dict=arxiv_dict)
                 sh(f"mv {paper_folder} done")
             except ExitCodeError:
@@ -255,7 +255,7 @@ if __name__ == "__main__":
             with open(f"{mdfile}", "rb") as f:
                 mdtext = f.read()
             mdtext = any_to_utf8(mdtext)
-            print(f"{mdtext}")
+            # print(f"{mdtext}")
             arxiv_id = ".".join(mdfile.split("/")[-1].split(".")[0:2]).split("v")[0]
             arxiv_dict[arxiv_id]["text"] = mdtext.split("/")[-1]
         except ExitCodeError and KeyError:
@@ -269,7 +269,7 @@ if __name__ == "__main__":
             with open(f"{main_tex_name_txt}", "rb") as f:
                 main_tex_name = f.read()
             main_tex_name = any_to_utf8(main_tex_name)
-            print(f"{main_tex_name}")
+            # print(f"{main_tex_name}")
             arxiv_id = ".".join(main_tex_name_txt.split("/")[-1].split(".")[0:2]).split(
                 "v"
             )[0]
@@ -278,6 +278,6 @@ if __name__ == "__main__":
             traceback.print_exc()
             print(f"Error reading {main_tex_name_txt}")
 
-    print(arxiv_dict[arxiv_id])
+    # print(arxiv_dict[arxiv_id])
     json.dump(arxiv_dict, open("arxiv_dict_updated.json", "w"))
     print("Finished updating arxiv_dict.json.")
