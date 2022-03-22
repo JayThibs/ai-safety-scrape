@@ -169,6 +169,12 @@ def main_convert(paper_dir_path):
 
 if __name__ == "__main__":
 
+    # Delete contents before starting?
+    # This is useful when you are testing and want to start from scratch
+    delete_contents = input("Delete data before starting? (y/n) ")
+    if delete_contents == "y":
+        sh("rm -rf tmp/* out/* outtxt/* files/*")
+
     # Automatic Mode will go through all the papers in files and try
     # to convert them to markdown.
     # Non-automatic mode will go through the errored papers one by one and
@@ -179,12 +185,14 @@ if __name__ == "__main__":
     else:
         automatic_mode = False
     if ls("tmp") == []:
-        citation_level = input(
-            "Citation level? (# 0 = original, 1 = citation of original, 2 = citation of citation, etc.): "
+        citation_level = int(
+            input(
+                "Citation level? (0 = original, 1 = citation of original, 2 = citation of citation, etc.): "
+            )
         )
         download_arxiv_paper_tars(citation_level=citation_level)
-        sh(f"mv {TARS_DIR}/* tmp/")
-        paper_tars = ls("tmp")
+        sh(f"mv {TARS_DIR}/* files/")
+        paper_tars = ls("files")
         pool.map(preextract_tar, paper_tars)
         pool.close()
         pool.join()
