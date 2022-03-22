@@ -163,7 +163,7 @@ if __name__ == "__main__":
         sh(
             f"rm -rf tmp out outtxt files done errored/pandoc_failures errored/unknown_errors/ fallback_needed/pdf_only/ fallback_needed/unknown_main_tex/ {TARS_DIR}/"
         )
-    sh("mkdir -p tmp out outtxt errored fallback_needed")
+    sh("mkdir -p tmp out outtxt errored fallback_needed files")
     sh(
         "mkdir -p fallback_needed/unknown_main_tex fallback_needed/pdf_only errored/pandoc_failures errored/unknown_errors"
     )
