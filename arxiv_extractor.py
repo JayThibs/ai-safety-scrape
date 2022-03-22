@@ -1,5 +1,6 @@
 import os
 from timeit import repeat
+from download_papers import download_arxiv_paper_tars
 from utils import *
 from extractor_functions import *
 import magic
@@ -11,11 +12,31 @@ from tqdm import tqdm
 import json
 import pandas as pd
 import traceback
+from pathlib import Path
 
+
+CODE_DIR = Path(".") / "code-projects/gpt-ai-safety"
+RAW_DIR = Path("data/raw")
+INTERIM_DIR = Path("data/interim")
+PROCESSED_DIR = Path("data/processed")
+TARS_DIR = RAW_DIR / "tars"
+LATEX_DIR = RAW_DIR / "latex_files"
+PDFS_DIR = RAW_DIR / "pdfs"
+PKLS_DIR = INTERIM_DIR / "pkls"
+EXTRACTED_TARS_DIR = INTERIM_DIR / "extracted_tars"
+MERGE_TEX_DIR = INTERIM_DIR / "merge_latex_files"
+PROCESSED_TXTS_DIR = PROCESSED_DIR / "txts"
+PROCESSED_JSONS_DIR = PROCESSED_DIR / "jsons"
 
 sh("mkdir -p tmp out outtxt errored fallback_needed")
 sh(
     "mkdir -p fallback_needed/unknown_main_tex fallback_needed/pdf_only errored/pandoc_failures errored/unknown_errors"
+)
+sh(
+    f"mkdir -p {RAW_DIR} {INTERIM_DIR} {PROCESSED_DIR} {TARS_DIR} {LATEX_DIR} {PDFS_DIR}"
+)
+sh(
+    f"mkdir -p {PKLS_DIR} {EXTRACTED_TARS_DIR} {MERGE_TEX_DIR} {PROCESSED_TXTS_DIR} {PROCESSED_JSONS_DIR}"
 )
 sh("rm -rf tmp/.DS_Store ||:")
 files = ls("files")
@@ -157,10 +178,16 @@ if __name__ == "__main__":
         automatic_mode = True
     else:
         automatic_mode = False
-    paper_tars = ls("files")
-    pool.map(preextract_tar, paper_tars)
-    pool.close()
-    pool.join()
+    if ls("tmp") == []:
+        citation_level = input(
+            "Citation level? (# 0 = original, 1 = citation of original, 2 = citation of citation, etc.): "
+        )
+        download_arxiv_paper_tars(citation_level=citation_level)
+        sh(f"mv {TARS_DIR}/* tmp/")
+        paper_tars = ls("tmp")
+        pool.map(preextract_tar, paper_tars)
+        pool.close()
+        pool.join()
     paper_folders = ls("tmp")
 
     if automatic_mode:
@@ -179,25 +206,17 @@ if __name__ == "__main__":
                 traceback.print_exc()
                 print(f"Error converting {paper_folder}")
 
-    # for paper_folder in ls("tmp"):
-    #     if os.path.isdir(paper_folder):
-    #         sh(f"mv {paper_folder} done")
-
-    for paper_folder in ls("errored/pandoc_failures"):
-        if os.path.isdir(paper_folder):
-            for file in ls(paper_folder):
-                if file.endswith("_failed"):
-                    sh(f"rm {file}")
-            sh(f"mv {paper_folder} tmp")
-
-    for paper_folder in ls("tmp"):
-        if os.path.isdir(paper_folder):
-            for file in ls(paper_folder):
-                if file.endswith("_failed"):
-                    sh(f"rm {file}")
+        for paper_folder in ls("errored/pandoc_failures"):
+            if os.path.isdir(paper_folder):
+                sh(f"mv {paper_folder} tmp")
 
     if not automatic_mode:
         pandoc_failures = ls("tmp")
+        for paper_folder in pandoc_failures:
+            if os.path.isdir(paper_folder):
+                for file in ls(paper_folder):
+                    if file.endswith("_failed"):
+                        sh(f"rm {file}")
         for i, paper_folder in enumerate(tqdm(pandoc_failures)):
             try:
                 print(f'Converting errored papers: "{paper_folder}"')
