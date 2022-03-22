@@ -189,7 +189,9 @@ if __name__ == "__main__":
             # This is useful when you are testing and want to start from scratch
             delete_contents = input("Delete data before starting? (y/n) ")
             if delete_contents == "y":
-                sh("rm -rf tmp/* out/* outtxt/* files/*")
+                sh(
+                    f"rm -rf tmp/* out/* outtxt/* files/* done/* errored/pandoc_failures/* errored/unknown_errors/* fallback_needed/pdf_only/* fallback_needed/unknown_main_tex/* {TARS_DIR}/*"
+                )
         download_arxiv_paper_tars(citation_level=citation_level)
         sh(f"mv {TARS_DIR}/* files/")
         paper_tars = ls("files")
