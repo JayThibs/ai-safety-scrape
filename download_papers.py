@@ -41,8 +41,13 @@ def download_arxiv_paper_tars(
         papers = list(set(df.values))
         print(f"{len(papers)} papers to download")
 
-    print(papers)
-    tars = ["0"] * len(papers)
+    tars = ["None"] * len(papers)
+
+    if ls(TARS_DIR):
+        tars = [tar.split("/")[-1] for tar in ls(TARS_DIR) if tar.endswith(".tar.gz")]
+        if len(tars) != len(papers):
+            # extend the tars list to match the length of the papers list
+            tars = tars + ["None"] * (len(papers) - len(tars))
 
     incorrect_links_ids = []
     paper_dl_failures = []
@@ -57,6 +62,8 @@ def download_arxiv_paper_tars(
         try:
             paper_id = paper_link.split("/")[-1]
             paper = next(arxiv.Search(id_list=[paper_id]).results())
+            if citation_level != 0 and paper.get_short_id()[:-2] in arxiv_dict.keys():
+                continue
             arxiv_dict[paper.get_short_id()[:-2]] = {
                 "source": "arxiv",
                 "source_filetype": "latex",
