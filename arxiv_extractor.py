@@ -2,6 +2,7 @@ import os
 from timeit import repeat
 from download_papers import download_arxiv_paper_tars
 from utils import *
+from fix_empty_conversions import mv_empty_mds
 from extractor_functions import *
 import magic
 
@@ -231,6 +232,8 @@ if __name__ == "__main__":
                 convert_tex_manual(paper_dir=paper_folder, arxiv_dict=arxiv_dict)
             except ExitCodeError:
                 traceback.print_exc()
+
+    mv_empty_mds()
 
     # with mp.Manager() as manager:
     #     d = manager.dict()
