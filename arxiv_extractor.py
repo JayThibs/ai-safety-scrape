@@ -28,18 +28,7 @@ MERGE_TEX_DIR = INTERIM_DIR / "merge_latex_files"
 PROCESSED_TXTS_DIR = PROCESSED_DIR / "txts"
 PROCESSED_JSONS_DIR = PROCESSED_DIR / "jsons"
 
-sh("mkdir -p tmp out outtxt errored fallback_needed")
-sh(
-    "mkdir -p fallback_needed/unknown_main_tex fallback_needed/pdf_only errored/pandoc_failures errored/unknown_errors"
-)
-sh(
-    f"mkdir -p {RAW_DIR} {INTERIM_DIR} {PROCESSED_DIR} {TARS_DIR} {LATEX_DIR} {PDFS_DIR}"
-)
-sh(
-    f"mkdir -p {PKLS_DIR} {EXTRACTED_TARS_DIR} {MERGE_TEX_DIR} {PROCESSED_TXTS_DIR} {PROCESSED_JSONS_DIR}"
-)
-sh("rm -rf tmp/.DS_Store ||:")
-files = ls("files")
+
 ignore_filenames = pd.read_csv("ignore_filenames.csv").values
 arxiv_citations_list = []
 
@@ -167,6 +156,23 @@ def main_convert(paper_dir_path):
 
 if __name__ == "__main__":
 
+    # Delete contents before starting?
+    # This is useful when you are testing and want to start from scratch
+    delete_contents = input("Delete data before starting? (y/n) ")
+    if delete_contents == "y":
+        sh(
+            f"rm -rf tmp out outtxt files done errored/pandoc_failures errored/unknown_errors/ fallback_needed/pdf_only/ fallback_needed/unknown_main_tex/ {TARS_DIR}/"
+        )
+    sh("mkdir -p tmp out outtxt errored fallback_needed")
+    sh(
+        "mkdir -p fallback_needed/unknown_main_tex fallback_needed/pdf_only errored/pandoc_failures errored/unknown_errors"
+    )
+    sh(
+        f"mkdir -p {RAW_DIR} {INTERIM_DIR} {PROCESSED_DIR} {TARS_DIR} {LATEX_DIR} {PDFS_DIR}"
+    )
+    sh(
+        f"mkdir -p {PKLS_DIR} {EXTRACTED_TARS_DIR} {MERGE_TEX_DIR} {PROCESSED_TXTS_DIR} {PROCESSED_JSONS_DIR}"
+    )
     # Automatic Mode will go through all the papers in files and try
     # to convert them to markdown.
     # Non-automatic mode will go through the errored papers one by one and
@@ -183,19 +189,12 @@ if __name__ == "__main__":
             )
         )
         if citation_level == 0:
-            # Delete contents before starting?
-            # This is useful when you are testing and want to start from scratch
-            delete_contents = input("Delete data before starting? (y/n) ")
-            if delete_contents == "y":
-                sh(
-                    f"rm -rf tmp/* out/* outtxt/* files/* done/* errored/pandoc_failures/* errored/unknown_errors/* fallback_needed/pdf_only/* fallback_needed/unknown_main_tex/* {TARS_DIR}/*"
-                )
-        download_arxiv_paper_tars(citation_level=citation_level)
-        sh(f"mv {TARS_DIR}/* files/")
-        paper_tars = ls("files")
-        pool.map(preextract_tar, paper_tars)
-        pool.close()
-        pool.join()
+            download_arxiv_paper_tars(citation_level=citation_level)
+            sh(f"mv {TARS_DIR}/* files/")
+            paper_tars = ls("files")
+            pool.map(preextract_tar, paper_tars)
+            pool.close()
+            pool.join()
     paper_folders = ls("tmp")
 
     if automatic_mode:
