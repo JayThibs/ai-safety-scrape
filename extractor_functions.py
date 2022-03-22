@@ -343,6 +343,17 @@ def convert_tex_manual(paper_dir, arxiv_dict):
 
         print("Was the error fixed? (y/n)")
         answer = input()
+        print("Would you like to use detex instead of pandoc? (y/n)")
+        detex_answer = input()
+        if detex_answer == "y":
+            sh(f"detex {main_doc} > {paper_id}.md")
+            # open detexed md file to clean it up
+            with open(f"{paper_id}.md", "r") as f:
+                paper_text = f.read()
+            paper_text = re.sub(r"\n\s+\n", "\n", paper_text)
+            paper_text = re.sub("\n{1,}", "\n\n", paper_text)
+            fixed_error = True
+            break
         if answer == "y":
             fixed_error = True
             break
