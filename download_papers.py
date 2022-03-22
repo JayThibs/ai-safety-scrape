@@ -33,10 +33,12 @@ def download_arxiv_paper_tars(
         df = pd.read_csv("ai-alignment-papers.csv", index_col=0)
         df_arxiv = df[df["Url"].str.contains("arxiv") == True]
         papers = list(set(df_arxiv["Url"].values))
+        print(f"{len(papers)} papers to download")
     else:
         citation_level = str(citation_level)
         df = pd.read_csv(f"all_citations_level_{citation_level}.csv", index_col=0)
         papers = list(set(df.values))
+        print(f"{len(papers)} papers to download")
 
     if os.path.exists(str(PKLS_DIR / "arxiv_paper_tars_list.pkl")):
         with open(str(PKLS_DIR / "arxiv_paper_tars_list.pkl"), "rb") as f:
