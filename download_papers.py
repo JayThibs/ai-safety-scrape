@@ -23,9 +23,20 @@ def download_arxiv_paper_tars(
     citation_level=0,
     create_dict_only=False,
 ):
-    df = pd.read_csv("ai-alignment-papers.csv", index_col=0)
-    df_arxiv = df[df["Url"].str.contains("arxiv") == True]
-    papers = list(set(df_arxiv["Url"].values))
+    """
+    Download arxiv paper tars.
+    Args:
+        citation_level: 0 = original, 1 = citation of original, 2 = citation of citation, etc.
+        create_dict_only: True or False
+    """
+    if citation_level == 0:
+        df = pd.read_csv("ai-alignment-papers.csv", index_col=0)
+        df_arxiv = df[df["Url"].str.contains("arxiv") == True]
+        papers = list(set(df_arxiv["Url"].values))
+    else:
+        citation_level = str(citation_level)
+        df = pd.read_csv(f"all_citations_level_{citation_level}.csv", index_col=0)
+        papers = list(set(df.values))
 
     if os.path.exists(str(PKLS_DIR / "arxiv_paper_tars_list.pkl")):
         with open(str(PKLS_DIR / "arxiv_paper_tars_list.pkl"), "rb") as f:
@@ -65,7 +76,7 @@ def download_arxiv_paper_tars(
                 "doi": paper.doi,
                 "primary_category": paper.primary_category,
                 "categories": paper.categories,
-                "citation_level": citation_level,  # 0 = original, 1 = citation of original, 2 = citation of citation, etc.
+                "citation_level": citation_level,
                 "main_tex_filename": "",
                 "text": "",
                 "bibliography_bbl": "",
