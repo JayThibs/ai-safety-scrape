@@ -64,7 +64,7 @@ def preextract_tar(tar_filepath, input_dir="files", output_dir="tmp"):
     Creates tmp/{tar_name} directory and extracts tar files and copies them to tmp/tar_name/*.
     Creates tmp/done_{tar_name} file to signal copy_tar that extraction is done.
     """
-    tar_name = tar_filepath.split("/")[-1][:-4]
+    tar_name = tar_filepath.split("/")[-1][:-7]
     if os.path.exists(f"{output_dir}/{tar_name}"):
         print(f"{tar_name} already extracted.")
         return
