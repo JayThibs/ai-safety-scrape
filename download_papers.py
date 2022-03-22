@@ -41,15 +41,9 @@ def download_arxiv_paper_tars(
         papers = list(set(df.values))
         print(f"{len(papers)} papers to download")
 
-    if os.path.exists(str(PKLS_DIR / "arxiv_paper_tars_list.pkl")):
-        with open(str(PKLS_DIR / "arxiv_paper_tars_list.pkl"), "rb") as f:
-            tars = pickle.load(f)
-    else:
-        tars = ["0"] * len(papers)
+    print(papers)
+    tars = ["0"] * len(papers)
 
-    if len(tars) != len(papers):
-        # this likely means we've added more papers to the list
-        tars = ["0"] * len(papers)
     incorrect_links_ids = []
     paper_dl_failures = []
     arxiv_dict = {}
