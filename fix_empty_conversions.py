@@ -1,4 +1,5 @@
 from utils import *
+import json
 
 
 def count_empty_mds(paper_dir):
@@ -24,3 +25,16 @@ def mv_empty_mds():
         folder = "done/" + file.split("/")[-1][:-3] + "/"
         sh(f"mv {file} {folder}")
         sh(f"mv {folder} fallback_needed/empty_mds/")
+
+    print("Done moving empty files to fallback_needed/empty_mds")
+
+
+def remove_empty_mds_from_dict(arxiv_dict):
+    empty_mds = [
+        empty_md.split("/")[-1][:-2] for empty_md in ls("fallback_needed/empty_mds")
+    ]
+    print("Removing the following papers from dict since the contents are empty: ")
+    print(empty_mds)
+    for empty_md in empty_mds:
+        arxiv_dict.pop(empty_md, None)
+    return arxiv_dict
