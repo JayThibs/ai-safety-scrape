@@ -22,6 +22,7 @@ PROCESSED_JSONS_DIR = PROCESSED_DIR / "jsons"
 
 def download_arxiv_paper_tars(
     citation_level=0,
+    arxiv_dict={},
     create_dict_only=False,
 ):
     """
@@ -51,7 +52,6 @@ def download_arxiv_paper_tars(
 
     incorrect_links_ids = []
     paper_dl_failures = []
-    arxiv_dict = {}
     for i, (paper_link, filename) in enumerate(tqdm(zip(papers, tars))):
         paper_id = ".".join(filename.split(".")[:2])
 
@@ -110,7 +110,7 @@ def download_arxiv_paper_tars(
         print("Paper download failures:")
         print(paper_dl_failures)
 
-    with open(PROCESSED_JSONS_DIR / "arxiv_dict.json", "w") as fp:
+    with open("arxiv_dict.json", "w") as fp:
         json.dump(arxiv_dict, fp)
 
     with open(PKLS_DIR / "arxiv_paper_tars_list.pkl", "wb") as f:
@@ -121,3 +121,5 @@ def download_arxiv_paper_tars(
 
     with open(PKLS_DIR / "paper_dl_failures_list.pkl", "wb") as f:
         pickle.dump(paper_dl_failures, f)
+
+    return arxiv_dict
