@@ -353,9 +353,11 @@ def convert_tex_manual(paper_dir, arxiv_dict):
             paper_text = re.sub(r"\n\s+\n", "\n", paper_text)
             paper_text = re.sub("\n{1,}", "\n\n", paper_text)
             fixed_error = True
+            os.chdir(project_dir)
             break
         if answer == "y":
             fixed_error = True
+            os.chdir(project_dir)
             break
         else:
             print(
