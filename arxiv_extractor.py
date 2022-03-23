@@ -2,7 +2,7 @@ import os
 from timeit import repeat
 from download_papers import download_arxiv_paper_tars
 from utils import *
-from fix_empty_conversions import mv_empty_mds
+from fix_empty_conversions import mv_empty_mds, remove_empty_mds_from_dict
 from extractor_functions import *
 import magic
 
@@ -30,11 +30,12 @@ PROCESSED_TXTS_DIR = PROCESSED_DIR / "txts"
 PROCESSED_JSONS_DIR = PROCESSED_DIR / "jsons"
 
 
+project_dir = os.getcwd()
 ignore_filenames = pd.read_csv("ignore_filenames.csv").values
 arxiv_citations_list = []
 
-if os.path.exists("arxiv_dict.json"):
-    arxiv_dict = json.load(open("arxiv_dict.json"))
+if os.path.exists("arxiv_dict_updated.json"):
+    arxiv_dict = json.load(open("arxiv_dict_updated.json"))
 else:
     arxiv_dict = {}
 
@@ -161,9 +162,10 @@ if __name__ == "__main__":
     # This is useful when you are testing and want to start from scratch
     delete_contents = input("Delete data before starting? (y/n) ")
     if delete_contents == "y":
-        sh(
-            f"rm -rf tmp out outtxt files done errored/pandoc_failures errored/unknown_errors/ fallback_needed/pdf_only/ fallback_needed/unknown_main_tex/ {TARS_DIR}/"
-        )
+        are_you_sure = input("Are you sure? (y/n) ")
+        if are_you_sure == "y":
+            sh(f"rm -rf out outtxt files done errored fallback_needed {TARS_DIR}/")
+    sh(f"rm -rf tmp")
     sh("mkdir -p tmp out outtxt errored fallback_needed files")
     sh(
         "mkdir -p fallback_needed/unknown_main_tex fallback_needed/pdf_only errored/pandoc_failures errored/unknown_errors"
@@ -183,24 +185,30 @@ if __name__ == "__main__":
         automatic_mode = True
     else:
         automatic_mode = False
-    if ls("tmp") == []:
-        citation_level = int(
-            input(
-                "Citation level? (0 = original, 1 = citation of original, 2 = citation of citation, etc.): "
-            )
+    citation_level = int(
+        input(
+            "Citation level? (0 = original, 1 = citation of original, 2 = citation of citation, etc.): "
         )
-        if citation_level == 0:
-            download_arxiv_paper_tars(citation_level=citation_level)
-            sh(f"mv {TARS_DIR}/* files/")
-            paper_tars = ls("files")
-            pool.map(preextract_tar, paper_tars)
-            pool.close()
-            pool.join()
-    paper_folders = ls("tmp")
+    )
+    dl_papers_answer = input("Download papers? (y/n): ")
+    if dl_papers_answer == "y":
+        arxiv_dict = download_arxiv_paper_tars(
+            citation_level=citation_level, arxiv_dict=arxiv_dict
+        )
+    sh(f"mv {TARS_DIR}/* files/")
+    paper_tars = ls("files")
+    pool.map(preextract_tar, paper_tars)
+    pool.close()
+    pool.join()
 
+    paper_folders = ls("tmp")
     if automatic_mode:
         for i, paper_folder in enumerate(tqdm(paper_folders)):
             print(f"{i}/{len(paper_folders)}")
+            done_paper_folder = "done/" + paper_folder.split("/")[-1]
+            if os.path.exists(done_paper_folder):
+                sh(f"rm -rf {paper_folder}")
+                continue
             try:
                 print(f"preparing {paper_folder}")
                 fix_chars_in_dirs(paper_folder)
@@ -208,8 +216,7 @@ if __name__ == "__main__":
                 delete_style_files(
                     paper_folder
                 )  # putting this here too to make sure they are deleted
-                if paper_folder == "tmp/1801.08757v1":
-                    print("here")
+
                 convert_tex(paper_dir=paper_folder, arxiv_dict=arxiv_dict)
                 sh(f"mv {paper_folder} done")
             except ExitCodeError:
@@ -217,7 +224,7 @@ if __name__ == "__main__":
                 print(f"Error converting {paper_folder}")
 
     if not automatic_mode:
-        for paper_folder in ls("errored/pandoc_failures"):
+        for paper_folder in ls("errored/pandoc_failures/"):
             if os.path.isdir(paper_folder):
                 sh(f"mv {paper_folder} tmp")
         pandoc_failures = ls("tmp")
@@ -229,6 +236,7 @@ if __name__ == "__main__":
         for i, paper_folder in enumerate(tqdm(pandoc_failures)):
             try:
                 print(f'Converting errored papers: "{paper_folder}"')
+                os.chdir(project_dir)
                 convert_tex_manual(paper_dir=paper_folder, arxiv_dict=arxiv_dict)
             except ExitCodeError:
                 traceback.print_exc()
@@ -257,7 +265,6 @@ if __name__ == "__main__":
             with open(f"{mdfile}", "rb") as f:
                 mdtext = f.read()
             mdtext = any_to_utf8(mdtext)
-            # print(f"{mdtext}")
             arxiv_id = ".".join(mdfile.split("/")[-1].split(".")[0:2]).split("v")[0]
             arxiv_dict[arxiv_id]["text"] = mdtext.split("/")[-1]
         except ExitCodeError and KeyError:
@@ -271,7 +278,6 @@ if __name__ == "__main__":
             with open(f"{main_tex_name_txt}", "rb") as f:
                 main_tex_name = f.read()
             main_tex_name = any_to_utf8(main_tex_name)
-            # print(f"{main_tex_name}")
             arxiv_id = ".".join(main_tex_name_txt.split("/")[-1].split(".")[0:2]).split(
                 "v"
             )[0]
@@ -280,6 +286,6 @@ if __name__ == "__main__":
             traceback.print_exc()
             print(f"Error reading {main_tex_name_txt}")
 
-    # print(arxiv_dict[arxiv_id])
+    arxiv_dict = remove_empty_mds_from_dict(arxiv_dict)
     json.dump(arxiv_dict, open("arxiv_dict_updated.json", "w"))
-    print("Finished updating arxiv_dict.json.")
+    print("Finished updating arxiv_dict_updated.json.")
