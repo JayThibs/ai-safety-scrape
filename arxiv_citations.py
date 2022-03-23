@@ -11,6 +11,5 @@ for paper_id in arxiv_citations_dict.keys():
 
 all_citations = pd.DataFrame(list(all_citations.keys()))
 print(all_citations)
-print(len(all_citations))
 citation_level = str(input("Enter citation level: "))
 all_citations.to_csv(f"all_citations_level_{citation_level}.csv", index=False)
