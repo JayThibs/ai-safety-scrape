@@ -39,7 +39,7 @@ def download_arxiv_paper_tars(
     else:
         citation_level = str(citation_level)
         df = pd.read_csv(f"all_citations_level_{citation_level}.csv", index_col=0)
-        papers = list(set(df.values))
+        papers = list(set(list(df.index)))
         print(f"{len(papers)} papers to download")
 
     tars = ["None"] * len(papers)
@@ -53,16 +53,21 @@ def download_arxiv_paper_tars(
     incorrect_links_ids = []
     paper_dl_failures = []
     for i, (paper_link, filename) in enumerate(tqdm(zip(papers, tars))):
+        paper_link = str(paper_link)
+        filename = str(filename)
         paper_id = ".".join(filename.split(".")[:2])
-
         if os.path.exists(str(TARS_DIR / filename)) and create_dict_only == False:
             print("Already downloaded the " + paper_id + " tar file.")
             continue
 
         try:
-            paper_id = paper_link.split("/")[-1]
+            if "/" in paper_link:
+                paper_id = paper_link.split("/")[-1]
+            else:
+                paper_id = paper_link
             paper = next(arxiv.Search(id_list=[paper_id]).results())
             if citation_level != 0 and paper.get_short_id()[:-2] in arxiv_dict.keys():
+                print(f"Skipping {paper_id} because it is already in dictionary.")
                 continue
             arxiv_dict[paper.get_short_id()[:-2]] = {
                 "source": "arxiv",
@@ -98,7 +103,7 @@ def download_arxiv_paper_tars(
         try:
             paper.download_source(dirpath=str(TARS_DIR), filename=tar_filename)
             print("; Downloaded paper: " + paper_id)
-        except HTTPError:
+        except:
             print("; Could not download paper: " + paper_id)
             paper_dl_failures.append(paper_id)
             pass
