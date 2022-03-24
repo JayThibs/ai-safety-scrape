@@ -164,8 +164,19 @@ if __name__ == "__main__":
     if delete_contents == "y":
         are_you_sure = input("Are you sure? (y/n) ")
         if are_you_sure == "y":
-            sh(f"rm -rf out outtxt files done errored fallback_needed {TARS_DIR}/")
-    sh(f"rm -rf tmp")
+            sh(f"rm -rf files errored fallback_needed {TARS_DIR}/")
+    automatic_mode = input("Automatic mode? (y/n): ")
+    if automatic_mode == "y":
+        automatic_mode = True
+    else:
+        automatic_mode = False
+    citation_level = int(
+        input(
+            "Citation level? (0 = original, 1 = citation of original, 2 = citation of citation, etc.): "
+        )
+    )
+    if automatic_mode:
+        sh(f"rm -rf tmp")
     sh("mkdir -p tmp out outtxt errored fallback_needed files")
     sh(
         "mkdir -p fallback_needed/unknown_main_tex fallback_needed/pdf_only errored/pandoc_failures errored/unknown_errors"
@@ -180,31 +191,28 @@ if __name__ == "__main__":
     # to convert them to markdown.
     # Non-automatic mode will go through the errored papers one by one and
     # ask the use to fix the error in the tex file to fix the conversion error.
-    automatic_mode = input("Automatic mode? (y/n): ")
-    if automatic_mode == "y":
-        automatic_mode = True
-    else:
-        automatic_mode = False
-    citation_level = int(
-        input(
-            "Citation level? (0 = original, 1 = citation of original, 2 = citation of citation, etc.): "
-        )
-    )
+    if citation_level > 0:
+        if ls("out") != [] and ls("outtxt") != []:
+            sh("mv out/* data/processed/txts/")
+            sh("mv outtxt/* data/processed/txts/")
+
     dl_papers_answer = input("Download papers? (y/n): ")
     if dl_papers_answer == "y":
         arxiv_dict = download_arxiv_paper_tars(
             citation_level=citation_level, arxiv_dict=arxiv_dict
         )
-    sh(f"mv {TARS_DIR}/* files/")
-    paper_tars = ls("files")
-    pool.map(preextract_tar, paper_tars)
-    pool.close()
-    pool.join()
+    if ls("files") == []:
+        sh(f"mv {TARS_DIR}/* files/")
 
-    paper_folders = ls("tmp")
     if automatic_mode:
+        paper_tars = ls("files")
+        pool.map(preextract_tar, paper_tars)
+        pool.close()
+        pool.join()
+        paper_folders = ls("tmp")
         for i, paper_folder in enumerate(tqdm(paper_folders)):
             print(f"{i}/{len(paper_folders)}")
+            os.chdir(project_dir)
             done_paper_folder = "done/" + paper_folder.split("/")[-1]
             if os.path.exists(done_paper_folder):
                 sh(f"rm -rf {paper_folder}")
@@ -216,17 +224,18 @@ if __name__ == "__main__":
                 delete_style_files(
                     paper_folder
                 )  # putting this here too to make sure they are deleted
-
                 convert_tex(paper_dir=paper_folder, arxiv_dict=arxiv_dict)
-                sh(f"mv {paper_folder} done")
+                if os.path.exists(paper_folder):
+                    sh(f"mv {paper_folder} done")
             except ExitCodeError:
                 traceback.print_exc()
                 print(f"Error converting {paper_folder}")
 
     if not automatic_mode:
-        for paper_folder in ls("errored/pandoc_failures/"):
-            if os.path.isdir(paper_folder):
-                sh(f"mv {paper_folder} tmp")
+        if ls("tmp") == []:
+            for paper_folder in ls("errored/pandoc_failures/"):
+                if os.path.isdir(paper_folder):
+                    sh(f"mv {paper_folder} tmp")
         pandoc_failures = ls("tmp")
         for paper_folder in pandoc_failures:
             if os.path.isdir(paper_folder):
@@ -237,7 +246,9 @@ if __name__ == "__main__":
             try:
                 print(f'Converting errored papers: "{paper_folder}"')
                 os.chdir(project_dir)
+                paper_folder = os.getcwd() + "/" + paper_folder
                 convert_tex_manual(paper_dir=paper_folder, arxiv_dict=arxiv_dict)
+                sh(f"mv {paper_folder} done")
             except ExitCodeError:
                 traceback.print_exc()
 
