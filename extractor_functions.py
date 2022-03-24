@@ -104,7 +104,12 @@ def convert_tex(
         paper_id = paper_dir.split("/")[-1]
         if os.path.exists(f"{output_dir}/{paper_id}.md"):
             print(f"{paper_id}.md already exists.")
-            sh(f"mv {paper_dir} done")
+            try:
+                sh(f"mv {paper_dir} done")
+            except ExitCodeError:
+                traceback.print_exc()
+                print(f"Error moving {paper_dir} to done.")
+                sh(f"rm -rf {paper_dir}")
             return
         os.chdir(paper_dir)
         paper_dir_full = os.getcwd()
@@ -343,21 +348,27 @@ def convert_tex_manual(paper_dir, arxiv_dict):
 
         print("Was the error fixed? (y/n)")
         answer = input()
-        print("Would you like to use detex instead of pandoc? (y/n)")
-        detex_answer = input()
-        if detex_answer == "y":
-            sh(f"detex {main_doc} > {paper_id}.md")
-            # open detexed md file to clean it up
-            with open(f"{paper_id}.md", "r") as f:
-                paper_text = f.read()
-            paper_text = re.sub(r"\n\s+\n", "\n", paper_text)
-            paper_text = re.sub("\n{1,}", "\n\n", paper_text)
-            fixed_error = True
-            os.chdir(project_dir)
-            break
+        if answer == "n":
+            print("Would you like to use detex instead of pandoc? (y/n)")
+            detex_answer = input()
+            if detex_answer == "y":
+                os.chdir(paper_dir)
+                sh(f"detex {main_doc} > {paper_id}.md")
+                # open detexed md file to clean it up
+                with open(f"{paper_id}.md", "r") as f:
+                    paper_text = f.read()
+                paper_text = re.sub(r"\n\s+\n", "\n", paper_text)
+                paper_text = re.sub("\n{1,}", "\n\n", paper_text)
+                with open(f"{paper_id}.md", "w") as f:
+                    f.write(paper_text)
+                fixed_error = True
+                os.chdir(project_dir)
+                sh(f"mv {paper_dir}/{paper_id}.md out/{paper_id}.md")
+                break
         if answer == "y":
             fixed_error = True
             os.chdir(project_dir)
+            sh(f"mv {paper_dir}/{paper_id}.md out/{paper_id}.md")
             break
         else:
             print(
