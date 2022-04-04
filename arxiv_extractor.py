@@ -166,16 +166,13 @@ if __name__ == "__main__":
         if are_you_sure == "y":
             sh(f"rm -rf files errored fallback_needed {TARS_DIR}/")
     automatic_mode = input("Automatic mode? (y/n): ")
-    if automatic_mode == "y":
-        automatic_mode = True
-    else:
-        automatic_mode = False
+
     citation_level = int(
         input(
             "Citation level? (0 = original, 1 = citation of original, 2 = citation of citation, etc.): "
         )
     )
-    if automatic_mode:
+    if automatic_mode == "y":
         sh(f"rm -rf tmp")
     sh("mkdir -p tmp out outtxt errored fallback_needed files")
     sh(
@@ -191,7 +188,7 @@ if __name__ == "__main__":
     # to convert them to markdown.
     # Non-automatic mode will go through the errored papers one by one and
     # ask the use to fix the error in the tex file to fix the conversion error.
-    if citation_level > 0:
+    if citation_level > 0 and automatic_mode == "y":
         if ls("out") != [] and ls("outtxt") != []:
             sh("mv out/* data/processed/txts/")
             sh("mv outtxt/* data/processed/txts/")
@@ -204,7 +201,7 @@ if __name__ == "__main__":
     if ls("files") == []:
         sh(f"mv {TARS_DIR}/* files/")
 
-    if automatic_mode:
+    if automatic_mode == "y":
         paper_tars = ls("files")
         pool.map(preextract_tar, paper_tars)
         pool.close()
@@ -231,7 +228,7 @@ if __name__ == "__main__":
                 traceback.print_exc()
                 print(f"Error converting {paper_folder}")
 
-    if not automatic_mode:
+    if automatic_mode != "y":
         if ls("tmp") == []:
             for paper_folder in ls("errored/pandoc_failures/"):
                 if os.path.isdir(paper_folder):
@@ -273,11 +270,11 @@ if __name__ == "__main__":
     for i, mdfile in enumerate(tqdm(ls("out"))):
         print(f"{i}/{len(ls('out'))}")
         try:
-            with open(f"{mdfile}", "rb") as f:
-                mdtext = f.read()
-            mdtext = any_to_utf8(mdtext)
-            arxiv_id = ".".join(mdfile.split("/")[-1].split(".")[0:2]).split("v")[0]
-            arxiv_dict[arxiv_id]["text"] = mdtext.split("/")[-1]
+            mdfile = mdfile.split("/")[-1]
+            id = mdfile.split("v")[0]
+            with open(f"out/{mdfile}", "r") as f:
+                text = f.read()
+            arxiv_dict[id]["text"] = text
         except ExitCodeError and KeyError:
             traceback.print_exc()
             print(f"Error reading {mdfile}")
@@ -286,12 +283,9 @@ if __name__ == "__main__":
         print(f"{i}/{len(ls('outtxt'))}")
         try:
             # load main_tex_name_txt
-            with open(f"{main_tex_name_txt}", "rb") as f:
+            with open(f"{main_tex_name_txt}", "r") as f:
                 main_tex_name = f.read()
-            main_tex_name = any_to_utf8(main_tex_name)
-            arxiv_id = ".".join(main_tex_name_txt.split("/")[-1].split(".")[0:2]).split(
-                "v"
-            )[0]
+            arxiv_id = main_tex_name_txt.split("/")[-1].split("v")[0]
             arxiv_dict[arxiv_id]["main_tex_filename"] = main_tex_name.split("/")[-1]
         except ExitCodeError and KeyError:
             traceback.print_exc()
