@@ -1,17 +1,12 @@
 import json
 from utils import *
 from tqdm import tqdm
-import multiprocessing as mp
 
 
 if __name__ == "__main__":
     arxiv_dict = json.load(open("arxiv_dict_updated.json"))
 
     new_arxiv_data = []
-
-    # pool = mp.Pool(processes=mp.cpu_count())
-    # for _ in tqdm(pool.imap_unordered(add_md_text, ls("out")), total=len(ls("out"))):
-    #     pass
 
     for mdfile in tqdm(ls("out")):
         mdfile = mdfile.split("/")[-1]
