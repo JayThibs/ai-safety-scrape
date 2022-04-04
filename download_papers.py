@@ -79,7 +79,7 @@ def download_arxiv_paper_tars(
                 "date_published": str(paper.published),
                 "data_last_modified": str(paper.updated),
                 "url": str(paper.entry_id),
-                "abstract": paper.summary,
+                "abstract": paper.summary.replace("\n", " "),
                 "author_comment": paper.comment,
                 "journal_ref": paper.journal_ref,
                 "doi": paper.doi,
