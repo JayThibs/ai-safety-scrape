@@ -38,3 +38,13 @@ def remove_empty_mds_from_dict(arxiv_dict):
     for empty_md in empty_mds:
         arxiv_dict.pop(empty_md, None)
     return arxiv_dict
+
+
+def remove_empty_texts_from_dict(arxiv_dict):
+    total_papers = len(arxiv_dict)
+    removed_papers = 0
+    for paper in arxiv_dict:
+        if len(paper["text"]) < 500 and paper["main_tex_filename"] != "":
+            removed_papers += 1
+            arxiv_dict.pop(paper["id"], None)
+    print(f"{removed_papers} out of {total_papers} papers removed")

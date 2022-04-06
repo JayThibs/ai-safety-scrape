@@ -2,7 +2,11 @@ import os
 from timeit import repeat
 from download_papers import download_arxiv_paper_tars
 from utils import *
-from fix_empty_conversions import mv_empty_mds, remove_empty_mds_from_dict
+from fix_empty_conversions import (
+    mv_empty_mds,
+    remove_empty_mds_from_dict,
+    remove_empty_texts_from_dict,
+)
 from extractor_functions import *
 import magic
 
@@ -299,5 +303,6 @@ if __name__ == "__main__":
             print(f"Error reading {main_tex_name_txt}")
 
     arxiv_dict = remove_empty_mds_from_dict(arxiv_dict)
+    arxiv_dict = remove_empty_texts_from_dict(arxiv_dict)
     json.dump(arxiv_dict, open("arxiv_dict_updated.json", "w"))
     print("Finished updating arxiv_dict_updated.json.")
