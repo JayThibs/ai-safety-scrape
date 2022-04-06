@@ -53,6 +53,9 @@ else:
     arxiv_citations_dict = {}
     json.dump(arxiv_citations_dict, open("arxiv_citations_dict.json", "w"))
 
+if not os.path.exists("ignore_dict.pkl"):
+    sh("python filenames_to_ignore.py")
+
 pool = mp.Pool(processes=mp.cpu_count())
 
 

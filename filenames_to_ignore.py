@@ -77,7 +77,7 @@ df = pd.read_csv("ignore_filenames.csv", header=None)
 print(df)
 
 
-def open_csv_to_dict(csv_file):
+def csv_to_dict(csv_file):
     """
     Opens a csv file and returns a dictionary of the contents.
     """
@@ -89,7 +89,7 @@ def open_csv_to_dict(csv_file):
         return ignore_dict
 
 
-ignore_dict = open_csv_to_dict("ignore_filenames.csv")
+ignore_dict = csv_to_dict("ignore_filenames.csv")
 if "Approached" in ignore_dict:
     print("Approach is in ignore_dict")
 else:
