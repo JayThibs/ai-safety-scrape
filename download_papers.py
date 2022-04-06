@@ -21,7 +21,7 @@ PROCESSED_JSONS_DIR = PROCESSED_DIR / "jsons"
 
 
 def download_arxiv_paper_tars(
-    citation_level=0,
+    citation_level="0",
     arxiv_dict={},
     create_dict_only=False,
 ):
@@ -31,13 +31,12 @@ def download_arxiv_paper_tars(
         citation_level: 0 = original, 1 = citation of original, 2 = citation of citation, etc.
         create_dict_only: True or False
     """
-    if citation_level == 0:
+    if citation_level == "0":
         df = pd.read_csv("ai-alignment-papers.csv", index_col=0)
         df_arxiv = df[df["Url"].str.contains("arxiv") == True]
         papers = list(set(df_arxiv["Url"].values))
         print(f"{len(papers)} papers to download")
     else:
-        citation_level = str(citation_level)
         df = pd.read_csv(f"all_citations_level_{citation_level}.csv", index_col=0)
         papers = list(set(list(df.index)))
         print(f"{len(papers)} papers to download")
@@ -66,7 +65,7 @@ def download_arxiv_paper_tars(
             else:
                 paper_id = paper_link
             paper = next(arxiv.Search(id_list=[paper_id]).results())
-            if citation_level != 0 and paper.get_short_id()[:-2] in arxiv_dict.keys():
+            if citation_level != "0" and paper.get_short_id()[:-2] in arxiv_dict.keys():
                 print(f"Skipping {paper_id} because it is already in dictionary.")
                 continue
             arxiv_dict[paper.get_short_id()[:-2]] = {

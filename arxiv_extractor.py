@@ -162,24 +162,22 @@ if __name__ == "__main__":
             sh(f"rm -rf files errored fallback_needed {TARS_DIR}/")
     automatic_mode = input("Automatic mode? (y/n): ")
 
-    citation_level = int(
+    citation_level = str(
         input(
             "Citation level? (0 = original, 1 = citation of original, 2 = citation of citation, etc.): "
         )
     )
-    if citation_level != 0:
+    if citation_level != "0":
         print(
             f"Citation level is {citation_level}, so we'll create a CSV of the papers at that citation level."
         )
-        arxiv_citations_dict = json.load(open("arxiv_citations_dict.json"))
         all_citations = {}
         for paper_id in arxiv_citations_dict.keys():
             for citation in arxiv_citations_dict[paper_id].keys():
                 all_citations[citation] = True
         all_citations = pd.DataFrame(list(all_citations.keys()))
-        print(all_citations)
-        citation_level = str(input("Enter citation level: "))
         all_citations.to_csv(f"all_citations_level_{citation_level}.csv", index=False)
+        print(f"Saved CSV of all citations at level {citation_level}.")
     if automatic_mode == "y":
         sh(f"rm -rf tmp")
     sh("mkdir -p tmp out outtxt errored fallback_needed files")
@@ -196,7 +194,7 @@ if __name__ == "__main__":
     # to convert them to markdown.
     # Non-automatic mode will go through the errored papers one by one and
     # ask the use to fix the error in the tex file to fix the conversion error.
-    if citation_level > 0 and automatic_mode == "y":
+    if citation_level != "0" and automatic_mode == "y":
         if ls("out") != [] and ls("outtxt") != []:
             sh("mv out/* data/processed/txts/")
             sh("mv outtxt/* data/processed/txts/")
