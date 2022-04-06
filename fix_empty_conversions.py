@@ -48,3 +48,4 @@ def remove_empty_texts_from_dict(arxiv_dict):
             removed_papers += 1
             arxiv_dict.pop(paper["id"], None)
     print(f"{removed_papers} out of {total_papers} papers removed")
+    return arxiv_dict

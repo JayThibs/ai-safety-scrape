@@ -171,6 +171,9 @@ if __name__ == "__main__":
             "Citation level? (0 = original, 1 = citation of original, 2 = citation of citation, etc.): "
         )
     )
+    remove_empty_papers = input(
+        "Remove papers that text extraction did not work from the json? (y/n) "
+    )
     if citation_level != "0":
         print(
             f"Citation level is {citation_level}, so we'll create a CSV of the papers at that citation level."
@@ -302,7 +305,8 @@ if __name__ == "__main__":
             traceback.print_exc()
             print(f"Error reading {main_tex_name_txt}")
 
-    arxiv_dict = remove_empty_mds_from_dict(arxiv_dict)
-    arxiv_dict = remove_empty_texts_from_dict(arxiv_dict)
+    if remove_empty_papers == "y":
+        arxiv_dict = remove_empty_mds_from_dict(arxiv_dict)
+        arxiv_dict = remove_empty_texts_from_dict(arxiv_dict)
     json.dump(arxiv_dict, open("arxiv_dict_updated.json", "w"))
     print("Finished updating arxiv_dict_updated.json.")
