@@ -1,5 +1,4 @@
 from utils import *
-import json
 
 
 def count_empty_mds(paper_dir):

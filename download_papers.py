@@ -1,12 +1,8 @@
 import os
 import pandas as pd
 from pathlib import Path
-from urllib import request
-from bs4 import BeautifulSoup
 import arxiv
-import tarfile
 import pickle
-from urllib.error import HTTPError
 import json
 from utils import *
 from tqdm import tqdm
