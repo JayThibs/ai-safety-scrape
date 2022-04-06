@@ -1,13 +1,10 @@
 import os
 import re
-import sys
 import json
 import chardet
 from utils import *
-from time import time
 import traceback
 import pickle
-from tika import parser
 
 
 main_tex_name_list = [
