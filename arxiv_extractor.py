@@ -39,6 +39,10 @@ if os.path.exists("arxiv_dict_updated.json"):
 else:
     arxiv_dict = {}
 
+# arxiv_citations_dict looks like this:
+# {root_paper_id_1: [citation_paper_id_1, citation_paper_id_2, ...],
+# root_paper_id_2: [citation_paper_id_1, citation_paper_id_2, ...], ...}
+# The dictionary is updated in the prepare_extracted_tars function.
 if os.path.exists("arxiv_citations_dict.json"):
     arxiv_citations_dict = json.load(open("arxiv_citations_dict.json"))
 else:
@@ -147,15 +151,6 @@ def delete_style_files(paper_dir_path):
             sh(f"rm {doc}")
 
 
-def main_convert(paper_dir_path):
-    for i in range(len(files)):
-        print(f"{i}/{len(files)}")
-        p = mp.Process(target=convert_tex, args=(paper_dir, "md", "out"))
-
-    sh(f"mv {dump} done")
-    print(f"marking {dump} as done")
-
-
 if __name__ == "__main__":
 
     # Delete contents before starting?
@@ -172,6 +167,19 @@ if __name__ == "__main__":
             "Citation level? (0 = original, 1 = citation of original, 2 = citation of citation, etc.): "
         )
     )
+    if citation_level != 0:
+        print(
+            f"Citation level is {citation_level}, so we'll create a CSV of the papers at that citation level."
+        )
+        arxiv_citations_dict = json.load(open("arxiv_citations_dict.json"))
+        all_citations = {}
+        for paper_id in arxiv_citations_dict.keys():
+            for citation in arxiv_citations_dict[paper_id].keys():
+                all_citations[citation] = True
+        all_citations = pd.DataFrame(list(all_citations.keys()))
+        print(all_citations)
+        citation_level = str(input("Enter citation level: "))
+        all_citations.to_csv(f"all_citations_level_{citation_level}.csv", index=False)
     if automatic_mode == "y":
         sh(f"rm -rf tmp")
     sh("mkdir -p tmp out outtxt errored fallback_needed files")
@@ -251,6 +259,7 @@ if __name__ == "__main__":
 
     mv_empty_mds()
 
+    # TODO: Make the pandoc conversion work with multiprocessing
     # with mp.Manager() as manager:
     #     d = manager.dict()
     #     d.update(arxiv_dict)
