@@ -1,5 +1,4 @@
 import os
-from timeit import repeat
 from download_papers import download_arxiv_paper_tars
 from utils import *
 from fix_empty_conversions import (
@@ -281,6 +280,7 @@ if __name__ == "__main__":
     # pool.map(convert_tex, paper_folders, initargs=(arxiv_dict,))
     # pool.close()
     # pool.join()
+
     print("Finished converting all papers.")
     print("Updating arxiv_dict.json...")
     # loop through files in out/ and outtxt/ and add to arxiv_dict
