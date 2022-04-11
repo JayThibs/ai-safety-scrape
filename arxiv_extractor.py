@@ -69,14 +69,16 @@ class ArxivExtractor:
         """
         Fetch all the arxiv entries from the arxiv API.
         """
+        print("Downloading all source files for arxiv entries...")
         self.arxiv_dict = download_arxiv_paper_tars(
             citation_level=self.citation_level, arxiv_dict=self.arxiv_dict
         )
-        print("Fetching all arxiv entries...")
-        arxiv_entries = []
-        for paper_id in tqdm(arxiv_dict.keys()):
-            arxiv_entries.append(arxiv.query(id_list=[paper_id]))
-        return arxiv_entries
+        print("Extracting text and citations from arxiv entries...")
+
+        mv_empty_mds()
+        self.arxiv_dict = remove_empty_mds_from_dict(self.arxiv_dict)
+        self.arxiv_dict = remove_empty_texts_from_dict(self.arxiv_dict)
+        print("Done extracting text and citations from arxiv entries.")
 
     def download_arxiv_paper_tars(
         citation_level="0",
