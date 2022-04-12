@@ -36,34 +36,29 @@ PROCESSED_JSONS_DIR = PROCESSED_DIR / "jsons"
 
 
 project_dir = os.getcwd()
-ignore_filenames = pd.read_csv("ignore_filenames.csv").values
-arxiv_citations_list = []
-
-if os.path.exists("arxiv_dict_updated.json"):
-    arxiv_dict = json.load(open("arxiv_dict_updated.json"))
-else:
-    arxiv_dict = {}
-
-# arxiv_citations_dict looks like this:
-# {root_paper_id_1: [citation_paper_id_1, citation_paper_id_2, ...],
-# root_paper_id_2: [citation_paper_id_1, citation_paper_id_2, ...], ...}
-# The dictionary is updated in the prepare_extracted_tars function.
-if os.path.exists("arxiv_citations_dict.json"):
-    arxiv_citations_dict = json.load(open("arxiv_citations_dict.json"))
-else:
-    arxiv_citations_dict = {}
-    json.dump(arxiv_citations_dict, open("arxiv_citations_dict.json", "w"))
-
-if not os.path.exists("ignore_dict.pkl"):
-    sh("python filenames_to_ignore.py")
-
-pool = mp.Pool(processes=mp.cpu_count())
 
 
 class ArxivExtractor:
-    def __init__(self, arxiv_dict: dict, citation_level: str):
+    def __init__(self, citation_level: str):
+        if os.path.exists("arxiv_dict_updated.json"):
+            self.arxiv_dict = json.load(open("arxiv_dict_updated.json"))
+        else:
+            self.arxiv_dict = {}
+
         self.citation_level = citation_level
-        self.arxiv_dict = arxiv_dict
+
+        # arxiv_citations_dict looks like this:
+        # {root_paper_id_1: [citation_paper_id_1, citation_paper_id_2, ...], ...}
+        # root_paper_id_2: [citation_paper_id_1, citation_paper_id_2, ...], ...}
+        # The dictionary is updated in the prepare_extracted_tars function.
+        if os.path.exists("arxiv_citations_dict.json"):
+            self.arxiv_citations_dict = json.load(open("arxiv_citations_dict.json"))
+        else:
+            self.arxiv_citations_dict = {}
+            json.dump(self.arxiv_citations_dict, open("arxiv_citations_dict.json", "w"))
+
+        if not os.path.exists("ignore_dict.pkl"):
+            sh("python filenames_to_ignore.py")
 
     def fetch_entries(self):
         """
@@ -324,7 +319,7 @@ if __name__ == "__main__":
             "Citation level? (0 = original, 1 = citation of original, 2 = citation of citation, etc.): "
         )
     )
-    arxiv_extractor = ArxivExtractor(citation_level)
+    arxiv_extractor = ArxivExtractor()
     remove_empty_papers = input(
         "Remove papers that text extraction did not work from the json? (y/n) "
     )
