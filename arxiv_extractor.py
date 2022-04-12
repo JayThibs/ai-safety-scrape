@@ -12,27 +12,11 @@ from extractor_functions import *
 import magic
 
 mime = magic.Magic(mime=True)
-import multiprocessing as mp
-from itertools import repeat
 from tqdm import tqdm
 import json
 import pandas as pd
 import traceback
 from pathlib import Path
-
-
-CODE_DIR = Path(".") / "code-projects/gpt-ai-safety"
-RAW_DIR = Path("data/raw")
-INTERIM_DIR = Path("data/interim")
-PROCESSED_DIR = Path("data/processed")
-TARS_DIR = RAW_DIR / "tars"
-LATEX_DIR = RAW_DIR / "latex_files"
-PDFS_DIR = RAW_DIR / "pdfs"
-PKLS_DIR = INTERIM_DIR / "pkls"
-EXTRACTED_TARS_DIR = INTERIM_DIR / "extracted_tars"
-MERGE_TEX_DIR = INTERIM_DIR / "merge_latex_files"
-PROCESSED_TXTS_DIR = PROCESSED_DIR / "txts"
-PROCESSED_JSONS_DIR = PROCESSED_DIR / "jsons"
 
 
 project_dir = os.getcwd()
@@ -59,6 +43,10 @@ class ArxivExtractor:
 
         if not os.path.exists("ignore_dict.pkl"):
             sh("python filenames_to_ignore.py")
+
+        delete_unwanted_files = input("Delete unwanted files? (y/n) ")
+        if delete_unwanted_files == "y":
+            sh("rm -rf files")
 
     def fetch_entries(self):
         """
@@ -188,6 +176,62 @@ class ArxivExtractor:
 
         return arxiv_dict
 
+    def _setup(self):
+
+        PROJECT_DIR = os.getcwd()
+        RAW_DIR = Path("data/raw")
+        INTERIM_DIR = Path("data/interim")
+        PROCESSED_DIR = Path("data/processed")
+        TARS_DIR = RAW_DIR / "tars"
+        LATEX_DIR = RAW_DIR / "latex_files"
+        PDFS_DIR = RAW_DIR / "pdfs"
+        PKLS_DIR = INTERIM_DIR / "pkls"
+        EXTRACTED_TARS_DIR = INTERIM_DIR / "extracted_tars"
+        MERGE_TEX_DIR = INTERIM_DIR / "merge_latex_files"
+        PROCESSED_TXTS_DIR = PROCESSED_DIR / "txts"
+        PROCESSED_JSONS_DIR = PROCESSED_DIR / "jsons"
+
+        # Delete contents before starting?
+        # This is useful when you are testing and want to start from scratch
+        delete_contents = input("Delete data before starting? (y/n) ")
+        if delete_contents == "y":
+            are_you_sure = input("Are you sure? (y/n) ")
+            if are_you_sure == "y":
+                sh(f"rm -rf files errored fallback_needed {TARS_DIR}/")
+        self.automatic_mode = input("Automatic mode? (y/n): ")
+
+        self.citation_level = str(
+            input(
+                "Citation level? (0 = original, 1 = citation of original, 2 = citation of citation, etc.): "
+            )
+        )
+        remove_empty_papers = input(
+            "Remove papers that text extraction did not work from the json? (y/n) "
+        )
+        if self.citation_level != "0":
+            pass
+
+        if self.automatic_mode == "y":
+            sh(f"rm -rf tmp")
+        sh("mkdir -p tmp out outtxt errored fallback_needed files")
+        sh(
+            "mkdir -p fallback_needed/unknown_main_tex fallback_needed/pdf_only errored/pandoc_failures errored/unknown_errors"
+        )
+        sh(
+            f"mkdir -p {RAW_DIR} {INTERIM_DIR} {PROCESSED_DIR} {TARS_DIR} {LATEX_DIR} {PDFS_DIR}"
+        )
+        sh(
+            f"mkdir -p {PKLS_DIR} {EXTRACTED_TARS_DIR} {MERGE_TEX_DIR} {PROCESSED_TXTS_DIR} {PROCESSED_JSONS_DIR}"
+        )
+        # Automatic Mode will go through all the papers in files and try
+        # to convert them to markdown.
+        # Non-automatic mode will go through the errored papers one by one and
+        # ask the use to fix the error in the tex file to fix the conversion error.
+        if self.citation_level != "0" and self.automatic_mode == "y":
+            if ls("out") != [] and ls("outtxt") != []:
+                sh("mv out/* data/processed/txts/")
+                sh("mv outtxt/* data/processed/txts/")
+
     def _create_citations_csv(self):
         """
         Create a csv file with all the arxiv citations for each paper.
@@ -203,149 +247,111 @@ class ArxivExtractor:
         all_citations.to_csv(f"all_citations_level_{citation_level}.csv", index=False)
         print(f"Saved CSV of all citations at level {citation_level}.")
 
-
-def fix_chars_in_dirs(parent):
-    for path, folders, files in os.walk(parent):
-        for f in files:
-            os.rename(os.path.join(path, f), os.path.join(path, f.replace(" ", "_")))
-        for folder in folders:
-            new_folder_name = folder.translate(
-                {ord(c): "_" for c in " !@#$%^&*()[]{};:,<>?\|`~-=+"}
-            )
-            if new_folder_name != folder:
+    def _fix_chars_in_dirs(parent):
+        for path, folders, files in os.walk(parent):
+            for f in files:
                 os.rename(
-                    os.path.join(path, folder), os.path.join(path, new_folder_name)
+                    os.path.join(path, f), os.path.join(path, f.replace(" ", "_"))
                 )
-
-
-def prepare_extracted_tars(paper_dir_path):
-    # extracts tar files to tmp/{dump_name}/*
-    paper_id = paper_dir_path.split("/")[-1]
-    try:
-        # load arxiv_citations_dict json to add citations to paper_id
-        arxiv_citations_dict = json.load(open("arxiv_citations_dict.json"))
-        try:
-            for doc in lsr(paper_dir_path):
-                if doc.endswith(".gz"):
-                    sh(f"gunzip {doc}")
-            for doc in lsr(paper_dir_path):
-                if doc.endswith(".tar"):
-                    # if tarfile, extract in {doc[:-3]}_extract folder and delete tarfile
-                    sh(
-                        f"mkdir -p {doc[:-3]}_extract && tar xf {doc[:-3]} -C {doc[:-3]}_extract"
+            for folder in folders:
+                new_folder_name = folder.translate(
+                    {ord(c): "_" for c in " !@#$%^&*()[]{};:,<>?\|`~-=+"}
+                )
+                if new_folder_name != folder:
+                    os.rename(
+                        os.path.join(path, folder), os.path.join(path, new_folder_name)
                     )
-                    sh(f"rm {doc[:-3]}")
-        except:
-            pass
-        for doc in lsr(paper_dir_path):
+
+    def _prepare_extracted_tars(paper_dir_path):
+        # extracts tar files to tmp/{dump_name}/*
+        paper_id = paper_dir_path.split("/")[-1]
+        try:
+            # load arxiv_citations_dict json to add citations to paper_id
+            arxiv_citations_dict = json.load(open("arxiv_citations_dict.json"))
             try:
-                if doc.endswith(".tex"):
-                    # if tex, do nothing and keep it
-                    pass
-
-                elif doc.endswith(".sty"):
-                    # if sty, delete it since it causes issues with pandoc
-                    # this file is a LaTeX Style document
-                    # (commonly used for formatting for a specific journal/conference)
-                    sh(f"rm {doc}")
-
-                elif doc.endswith(".bbl") or doc.endswith(".bib"):
-                    # if bbl, extract arxiv ids from citations, add to list, and delete bbl
-                    arxiv_citations, bibliography = get_arxiv_ids(doc)
-                    if len(arxiv_citations) > 0:
-                        for arxiv_id in arxiv_citations:
-                            if arxiv_citations_dict.get(paper_id) is None:
-                                arxiv_citations_dict[paper_id] = {arxiv_id: True}
-                            else:
-                                arxiv_citations_dict[paper_id].update({arxiv_id: True})
-                        json.dump(
-                            arxiv_citations_dict, open("arxiv_citations_dict.json", "w")
+                for doc in lsr(paper_dir_path):
+                    if doc.endswith(".gz"):
+                        sh(f"gunzip {doc}")
+                for doc in lsr(paper_dir_path):
+                    if doc.endswith(".tar"):
+                        # if tarfile, extract in {doc[:-3]}_extract folder and delete tarfile
+                        sh(
+                            f"mkdir -p {doc[:-3]}_extract && tar xf {doc[:-3]} -C {doc[:-3]}_extract"
                         )
-                        id = paper_id.split("v")[0]  # remove version number
-                        arxiv_dict[id]["arxiv_citations"] = arxiv_citations_dict[
-                            paper_id
-                        ]
-                    if doc.endswith(".bbl"):
-                        arxiv_dict[id]["bibliography_bbl"] = bibliography
-                    elif doc.endswith(".bib"):
-                        arxiv_dict[id]["bibliography_bib"] = bibliography
-                    json.dump(arxiv_dict, open("arxiv_dict.json", "w"))
+                        sh(f"rm {doc[:-3]}")
+            except:
+                pass
+            for doc in lsr(paper_dir_path):
+                try:
+                    if doc.endswith(".tex"):
+                        # if tex, do nothing and keep it
+                        pass
 
-                # check if filename has no extension, this is likely a .tex file
-                # if so, add .tex to the filename
-                # these files are typically named with the arxiv id (e.g. 1801.01234)
-                elif re.findall(
-                    r"(\d{4}\.\d{4,5})", doc.split("/")[-1]
-                ) != [] and not doc.endswith(".pdf"):
-                    # add .tex to filename
-                    sh(f"mv {doc} {doc}.tex")
+                    elif doc.endswith(".sty"):
+                        # if sty, delete it since it causes issues with pandoc
+                        # this file is a LaTeX Style document
+                        # (commonly used for formatting for a specific journal/conference)
+                        sh(f"rm {doc}")
 
-                elif doc.endswith(".DS_Store"):
-                    # delete .DS_Store files
-                    sh(f"rm {doc}")
+                    elif doc.endswith(".bbl") or doc.endswith(".bib"):
+                        # if bbl, extract arxiv ids from citations, add to list, and delete bbl
+                        arxiv_citations, bibliography = get_arxiv_ids(doc)
+                        if len(arxiv_citations) > 0:
+                            for arxiv_id in arxiv_citations:
+                                if arxiv_citations_dict.get(paper_id) is None:
+                                    arxiv_citations_dict[paper_id] = {arxiv_id: True}
+                                else:
+                                    arxiv_citations_dict[paper_id].update(
+                                        {arxiv_id: True}
+                                    )
+                            json.dump(
+                                arxiv_citations_dict,
+                                open("arxiv_citations_dict.json", "w"),
+                            )
+                            id = paper_id.split("v")[0]  # remove version number
+                            arxiv_dict[id]["arxiv_citations"] = arxiv_citations_dict[
+                                paper_id
+                            ]
+                        if doc.endswith(".bbl"):
+                            arxiv_dict[id]["bibliography_bbl"] = bibliography
+                        elif doc.endswith(".bib"):
+                            arxiv_dict[id]["bibliography_bib"] = bibliography
+                        json.dump(arxiv_dict, open("arxiv_dict.json", "w"))
 
-                else:
-                    pass
-                    # if not .tex or .bbl, just delete file
-                    # sh(f"rm {doc}")
-            except ExitCodeError:
-                traceback.print_exc()
-                print(f"Error deleting file: {doc}")
-    except Exception:
-        traceback.print_exc()
-        print(f"Error deleting files in {paper_id}")
+                    # check if filename has no extension, this is likely a .tex file
+                    # if so, add .tex to the filename
+                    # these files are typically named with the arxiv id (e.g. 1801.01234)
+                    elif re.findall(
+                        r"(\d{4}\.\d{4,5})", doc.split("/")[-1]
+                    ) != [] and not doc.endswith(".pdf"):
+                        # add .tex to filename
+                        sh(f"mv {doc} {doc}.tex")
 
+                    elif doc.endswith(".DS_Store"):
+                        # delete .DS_Store files
+                        sh(f"rm {doc}")
 
-def delete_style_files(paper_dir_path):
-    # delete all files with .sty extension
-    for doc in lsr(paper_dir_path):
-        if doc.endswith(".sty"):
-            sh(f"rm {doc}")
+                    else:
+                        pass
+                        # if not .tex or .bbl, just delete file
+                        # sh(f"rm {doc}")
+                except ExitCodeError:
+                    traceback.print_exc()
+                    print(f"Error deleting file: {doc}")
+        except Exception:
+            traceback.print_exc()
+            print(f"Error deleting files in {paper_id}")
+
+    def _delete_style_files(paper_dir_path):
+        # delete all files with .sty extension
+        for doc in lsr(paper_dir_path):
+            if doc.endswith(".sty"):
+                sh(f"rm {doc}")
 
 
 if __name__ == "__main__":
 
-    # Delete contents before starting?
-    # This is useful when you are testing and want to start from scratch
-    delete_contents = input("Delete data before starting? (y/n) ")
-    if delete_contents == "y":
-        are_you_sure = input("Are you sure? (y/n) ")
-        if are_you_sure == "y":
-            sh(f"rm -rf files errored fallback_needed {TARS_DIR}/")
-    automatic_mode = input("Automatic mode? (y/n): ")
-
-    citation_level = str(
-        input(
-            "Citation level? (0 = original, 1 = citation of original, 2 = citation of citation, etc.): "
-        )
-    )
     arxiv_extractor = ArxivExtractor()
-    remove_empty_papers = input(
-        "Remove papers that text extraction did not work from the json? (y/n) "
-    )
-    if citation_level != "0":
-        pass
-
-    if automatic_mode == "y":
-        sh(f"rm -rf tmp")
-    sh("mkdir -p tmp out outtxt errored fallback_needed files")
-    sh(
-        "mkdir -p fallback_needed/unknown_main_tex fallback_needed/pdf_only errored/pandoc_failures errored/unknown_errors"
-    )
-    sh(
-        f"mkdir -p {RAW_DIR} {INTERIM_DIR} {PROCESSED_DIR} {TARS_DIR} {LATEX_DIR} {PDFS_DIR}"
-    )
-    sh(
-        f"mkdir -p {PKLS_DIR} {EXTRACTED_TARS_DIR} {MERGE_TEX_DIR} {PROCESSED_TXTS_DIR} {PROCESSED_JSONS_DIR}"
-    )
-    # Automatic Mode will go through all the papers in files and try
-    # to convert them to markdown.
-    # Non-automatic mode will go through the errored papers one by one and
-    # ask the use to fix the error in the tex file to fix the conversion error.
-    if citation_level != "0" and automatic_mode == "y":
-        if ls("out") != [] and ls("outtxt") != []:
-            sh("mv out/* data/processed/txts/")
-            sh("mv outtxt/* data/processed/txts/")
 
     dl_papers_answer = input("Download papers? (y/n): ")
     if dl_papers_answer == "y":
