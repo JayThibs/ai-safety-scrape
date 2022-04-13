@@ -1,16 +1,9 @@
 import os
 import re
 import chardet
-from download_papers import download_arxiv_paper_tars
 import arxiv
 import pickle
 from utils import *
-from fix_empty_conversions import (
-    mv_empty_mds,
-    remove_empty_mds_from_dict,
-    remove_empty_texts_from_dict,
-)
-from extractor_functions import *
 import magic
 
 mime = magic.Magic(mime=True)
@@ -36,23 +29,45 @@ class ArxivPapers:
         print("Downloading all source files for arxiv entries...")
         dl_papers_answer = input("Download papers? (y/n): ")
         if dl_papers_answer == "y":
-            self.arxiv_dict = download_arxiv_paper_tars(
-                citation_level=self.citation_level, arxiv_dict=self.arxiv_dict
-            )
+            self.arxiv_dict = self.download_arxiv_paper_tars()
         if ls("files") == []:
             sh(f"mv {self.TARS_DIR}/* files/")
         print("Extracting text and citations from arxiv entries...")
 
-        if automatic_mode == "y":
+        if self.automatic_mode == "y":
             self.automatic_extraction()
 
-        if automatic_mode != "y":
+        if self.automatic_mode != "y":
             self.manual_extraction()
 
-        mv_empty_mds()
-        self.arxiv_dict = remove_empty_mds_from_dict(self.arxiv_dict)
-        self.arxiv_dict = remove_empty_texts_from_dict(self.arxiv_dict)
+        self._mv_empty_mds()
         print("Done extracting text and citations from arxiv entries.")
+
+        print("Finished converting all papers.")
+        print("Updating arxiv_dict.json...")
+        # loop through files in out/ and outtxt/ and add to arxiv_dict
+        for i, mdfile in enumerate(tqdm(ls("out"))):
+            print(f"{i}/{len(ls('out'))}")
+            self.insert_text_in_dict(mdfile)
+
+        for i, main_tex_name_txt in enumerate(tqdm(ls("outtxt"))):
+            print(f"{i}/{len(ls('outtxt'))}")
+            self.insert_main_tex_in_dict(main_tex_name_txt)
+
+        if self.remove_empty_papers == "y":
+            arxiv_dict = self._remove_empty_mds_from_dict(arxiv_dict)
+            arxiv_dict = self._remove_empty_texts_from_dict(arxiv_dict)
+        json.dump(arxiv_dict, open("arxiv_dict_updated.json", "w"))
+        print("Finished updating arxiv_dict_updated.json.")
+
+        delete_unwanted_files = input(
+            "Delete unwanted files (only keep .jsonl and main .txt files)? (y/n) "
+        )
+
+        if delete_unwanted_files == "y":
+            sh(
+                "rm -rf tmp files done out outtxt errored fallback_needed data/interim data/raw"
+            )
 
     def setup(self):
 
@@ -62,8 +77,8 @@ class ArxivPapers:
         self.PROCESSED_DIR = Path("data/processed")
         self.TARS_DIR = self.RAW_DIR / "tars"
         self.LATEX_DIR = self.RAW_DIR / "latex_files"
-        self.PDFS_DIR = self.INTERIM_DIR / "pdfs"
         self.PKLS_DIR = self.INTERIM_DIR / "pkls"
+        self.PDFS_DIR = self.PROCESSED_DIR / "pdfs"
         self.PROCESSED_TXTS_DIR = self.PROCESSED_DIR / "txts"
         self.PROCESSED_JSONS_DIR = self.PROCESSED_DIR / "jsons"
 
@@ -83,11 +98,7 @@ class ArxivPapers:
             json.dump(self.arxiv_citations_dict, open("arxiv_citations_dict.json", "w"))
 
         if not os.path.exists("ignore_dict.pkl"):
-            sh("python filenames_to_ignore.py")
-
-        delete_unwanted_files = input("Delete unwanted files? (y/n) ")
-        if delete_unwanted_files == "y":
-            sh("rm -rf files")
+            self._filenames_to_ignore()
 
         # Delete contents before starting?
         # This is useful when you are testing and want to start from scratch
@@ -103,9 +114,7 @@ class ArxivPapers:
                 "Citation level? (0 = original, 1 = citation of original, 2 = citation of citation, etc.): "
             )
         )
-        remove_empty_papers = input(
-            "Remove papers that text extraction did not work from the json? (y/n) "
-        )
+        self.remove_empty_papers = "y"  # replace with input() later
         if self.citation_level != "0":
             pass
 
@@ -156,8 +165,6 @@ class ArxivPapers:
 
     def download_arxiv_paper_tars(
         self,
-        citation_level="0",
-        arxiv_dict={},
         create_dict_only=False,
     ):
         """
@@ -166,13 +173,15 @@ class ArxivPapers:
             citation_level: 0 = original, 1 = citation of original, 2 = citation of citation, etc.
             create_dict_only: True or False
         """
-        if citation_level == "0":
+        if self.citation_level == "0":
             df = pd.read_csv(self.papers_csv_path, index_col=0)
             df_arxiv = df[df["Url"].str.contains("arxiv") == True]
             papers = list(set(df_arxiv["Url"].values))
             print(f"{len(papers)} papers to download")
         else:
-            df = pd.read_csv(f"all_citations_level_{citation_level}.csv", index_col=0)
+            df = pd.read_csv(
+                f"all_citations_level_{self.citation_level}.csv", index_col=0
+            )
             papers = list(set(list(df.index)))
             print(f"{len(papers)} papers to download")
 
@@ -208,12 +217,12 @@ class ArxivPapers:
                     paper_id = paper_link
                 paper = next(arxiv.Search(id_list=[paper_id]).results())
                 if (
-                    citation_level != "0"
-                    and paper.get_short_id()[:-2] in arxiv_dict.keys()
+                    self.citation_level != "0"
+                    and paper.get_short_id()[:-2] in self.arxiv_dict.keys()
                 ):
                     print(f"Skipping {paper_id} because it is already in dictionary.")
                     continue
-                arxiv_dict[paper.get_short_id()[:-2]] = {
+                self.arxiv_dict[paper.get_short_id()[:-2]] = {
                     "source": "arxiv",
                     "source_filetype": "latex",
                     "converted_with": "pandoc",
@@ -229,7 +238,7 @@ class ArxivPapers:
                     "doi": paper.doi,
                     "primary_category": paper.primary_category,
                     "categories": paper.categories,
-                    "citation_level": citation_level,
+                    "citation_level": self.citation_level,
                     "main_tex_filename": "",
                     "text": "",
                     "bibliography_bbl": "",
@@ -260,7 +269,7 @@ class ArxivPapers:
             print(paper_dl_failures)
 
         with open("arxiv_dict.json", "w") as fp:
-            json.dump(arxiv_dict, fp)
+            json.dump(self.arxiv_dict, fp)
 
         with open(self.PKLS_DIR / "arxiv_paper_tars_list.pkl", "wb") as f:
             pickle.dump(tars, f)
@@ -271,12 +280,12 @@ class ArxivPapers:
         with open(self.PKLS_DIR / "paper_dl_failures_list.pkl", "wb") as f:
             pickle.dump(paper_dl_failures, f)
 
-        return arxiv_dict
+        return self.arxiv_dict
 
     def automatic_extraction(self):
         pool = mp.Pool(processes=mp.cpu_count())
         paper_tars = ls("files")
-        pool.map(preextract_tar, paper_tars)
+        pool.map(self._preextract_tar, paper_tars)
         pool.close()
         pool.join()
         paper_folders = ls("tmp")
@@ -294,7 +303,7 @@ class ArxivPapers:
                 self._delete_style_files(
                     paper_folder
                 )  # putting this here too to make sure they are deleted
-                convert_tex(paper_dir=paper_folder, arxiv_dict=self.arxiv_dict)
+                self.convert_tex(paper_dir=paper_folder, arxiv_dict=self.arxiv_dict)
                 if os.path.exists(paper_folder):
                     sh(f"mv {paper_folder} done")
             except ExitCodeError:
@@ -327,7 +336,6 @@ class ArxivPapers:
     def convert_tex(
         self,
         paper_dir,
-        arxiv_dict,
         output_dir="out",
         main_tex_output_dir="outtxt",
         manual_conversion=False,
@@ -356,7 +364,7 @@ class ArxivPapers:
             print("Current directory: " + os.getcwd())
             print("paper_id: " + paper_id)
             assert len(ls(".")) > 0
-            convert_to_utf8(rootdir=".")
+            self._convert_to_utf8(rootdir=".")
             paper_dir_root = ls(".")
             paper_dir_all_files = lsr(".")
             num_tex_files = num_pdf_files = root_tex_files = 0
@@ -371,10 +379,10 @@ class ArxivPapers:
                     num_pdf_files += 1
             if num_pdf_files > 0 and num_tex_files == 0:
                 print("Paper only contains PDF. Not LaTeX files. Skipping conversion.")
-                os.chdir(project_dir)
-                arxiv_dict[number_id]["source_filetype"] = "pdf"
-                arxiv_dict[number_id]["converted_with"] = ""
-                json.dump(arxiv_dict, open("arxiv_dict.json", "w"))
+                os.chdir(self.PROJECT_DIR)
+                self.arxiv_dict[number_id]["source_filetype"] = "pdf"
+                self.arxiv_dict[number_id]["converted_with"] = ""
+                json.dump(self.arxiv_dict, open("arxiv_dict.json", "w"))
                 sh(f"mv -f {paper_dir} fallback_needed/pdf_only")
                 return
             for doc in paper_dir_root:
@@ -391,7 +399,7 @@ class ArxivPapers:
                     and not manual_conversion
                 ):
                     print(f"{paper_id} failed to convert with pandoc.")
-                    os.chdir(project_dir)
+                    os.chdir(self.PROJECT_DIR)
                     if not manual_conversion:
                         sh(f"mv -f {paper_dir} errored/pandoc_failures/")
                     return
@@ -399,10 +407,12 @@ class ArxivPapers:
                     return main_doc
                 with open(f"{paper_id}.md", "r") as f:
                     paper_text = f.read()
-                arxiv_dict[number_id]["text"] = paper_text
-                arxiv_dict[number_id]["main_tex_filename"] = main_doc
-                json.dump(arxiv_dict, open(f"{project_dir}/arxiv_dict.json", "w"))
-                os.chdir(project_dir)
+                self.arxiv_dict[number_id]["text"] = paper_text
+                self.arxiv_dict[number_id]["main_tex_filename"] = main_doc
+                json.dump(
+                    self.arxiv_dict, open(f"{self.PROJECT_DIR}/arxiv_dict.json", "w")
+                )
+                os.chdir(self.PROJECT_DIR)
                 sh(f"mv {paper_dir}/{paper_id}.md {output_dir}/{paper_id}.md")
                 # TODO: there's a better way to do this, but to make multiprocessing work,
                 # I'm going to create a .txt file for each paper and store the main_tex_name in it.
@@ -415,7 +425,7 @@ class ArxivPapers:
                 # if there are multiple tex files,
                 # check for the main file based on a common list of names
                 filenames_to_ignore = pickle.load(
-                    open(f"{project_dir}/ignore_dict.pkl", "rb")
+                    open(f"{self.PROJECT_DIR}/ignore_dict.pkl", "rb")
                 )
                 print(filenames_to_ignore)
                 os.chdir(paper_dir_full)
@@ -423,16 +433,16 @@ class ArxivPapers:
                     doc.split("/")[-1] for doc in ls(".") if doc.endswith(".tex")
                 ]
                 print(list_of_tex_files)
-                print(main_tex_name_list)
+                print(self.main_tex_name_list)
                 matched_list = [
                     doc
                     for doc in list_of_tex_files
-                    if doc.lower() in main_tex_name_list
+                    if doc.lower() in self.main_tex_name_list
                 ]
                 if len(matched_list) == 0:
                     # if there are no matches with main list, try substring list
                     # these are typically conference names with a lot of variations (e.g. "icml2020.tex")
-                    for tex_substring in main_tex_name_substrings:
+                    for tex_substring in self.main_tex_name_substrings:
                         matched_list = [
                             doc
                             for doc in list_of_tex_files
@@ -452,7 +462,7 @@ class ArxivPapers:
                         and not manual_conversion
                     ):
                         print(f"{paper_id} failed to convert with pandoc.")
-                        os.chdir(project_dir)
+                        os.chdir(self.PROJECT_DIR)
                         if not manual_conversion:
                             sh(f"mv -f {paper_dir} errored/pandoc_failures/")
                         return
@@ -460,11 +470,14 @@ class ArxivPapers:
                         return main_doc
                     with open(f"{paper_id}.md", "r") as f:
                         paper_text = f.read()
-                    arxiv_dict[number_id]["text"] = paper_text
-                    arxiv_dict[number_id]["main_tex_filename"] = main_doc
-                    json.dump(arxiv_dict, open(f"{project_dir}/arxiv_dict.json", "w"))
+                    self.arxiv_dict[number_id]["text"] = paper_text
+                    self.arxiv_dict[number_id]["main_tex_filename"] = main_doc
+                    json.dump(
+                        self.arxiv_dict,
+                        open(f"{self.PROJECT_DIR}/arxiv_dict.json", "w"),
+                    )
                     # go back to root
-                    os.chdir(project_dir)
+                    os.chdir(self.PROJECT_DIR)
                     sh(f"mv {paper_dir}/{paper_id}.md {output_dir}/{paper_id}.md")
                     with open(f"{main_tex_output_dir}/{paper_id}.txt", "w") as f:
                         f.write(main_doc)
@@ -492,7 +505,7 @@ class ArxivPapers:
                             and not manual_conversion
                         ):
                             print(f"{paper_id} failed to convert with pandoc.")
-                            os.chdir(project_dir)
+                            os.chdir(self.PROJECT_DIR)
                             if not manual_conversion:
                                 sh(f"mv -f {paper_dir} errored/pandoc_failures/")
                             return
@@ -500,22 +513,23 @@ class ArxivPapers:
                             return main_doc
                         with open(f"{paper_id}.md", "r") as f:
                             paper_text = f.read()
-                        arxiv_dict[number_id]["text"] = paper_text
-                        arxiv_dict[number_id]["main_tex_filename"] = main_doc
+                        self.arxiv_dict[number_id]["text"] = paper_text
+                        self.arxiv_dict[number_id]["main_tex_filename"] = main_doc
                         json.dump(
-                            arxiv_dict, open(f"{project_dir}/arxiv_dict.json", "w")
+                            self.arxiv_dict,
+                            open(f"{self.PROJECT_DIR}/arxiv_dict.json", "w"),
                         )
                         # go back to root
-                        os.chdir(project_dir)
+                        os.chdir(self.PROJECT_DIR)
                         sh(f"mv {paper_dir}/{paper_id}.md {output_dir}/{paper_id}.md")
                         with open(f"{main_tex_output_dir}/{paper_id}.txt", "w") as f:
                             f.write(main_doc)
                         return main_doc
 
-                    if arxiv_dict[number_id]["main_tex_filename"] != "":
+                    if self.arxiv_dict[number_id]["main_tex_filename"] != "":
                         # if main file was stored in arxiv_dict, use it
                         # arxiv_dict is created when we need to use convert_tex_semiauto and manually inputting main tex filename
-                        main_tex = arxiv_dict[number_id]["main_tex_filename"]
+                        main_tex = self.arxiv_dict[number_id]["main_tex_filename"]
                         sh(
                             f"if ! timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none; then touch {paper_id}_pandoc_failed; fi"
                         )
@@ -532,11 +546,12 @@ class ArxivPapers:
                             return main_doc
                         with open(f"{paper_id}.md", "r") as f:
                             paper_text = f.read()
-                        arxiv_dict[number_id]["text"] = paper_text
+                        self.arxiv_dict[number_id]["text"] = paper_text
                         json.dump(
-                            arxiv_dict, open(f"{project_dir}/arxiv_dict.json", "w")
+                            self.arxiv_dict,
+                            open(f"{self.PROJECT_DIR}/arxiv_dict.json", "w"),
                         )
-                        os.chdir(project_dir)
+                        os.chdir(self.PROJECT_DIR)
                         sh(f"mv {paper_dir}/{paper_id}.md out/{paper_id}.md")
                         return main_doc
                     else:
@@ -546,7 +561,7 @@ class ArxivPapers:
                         print(
                             f"{paper_id} main filename not found in main_tex_dict, sending to fallback_needed"
                         )
-                        os.chdir(project_dir)
+                        os.chdir(self.PROJECT_DIR)
                         sh(f"mv -f {paper_dir} fallback_needed/unknown_main_tex/")
                         return
 
@@ -556,10 +571,10 @@ class ArxivPapers:
                 if not manual_conversion:
                     with open(f"error_log.txt", "a") as f:
                         f.write(f"{traceback.format_exc()}")
-                    with open(f"{project_dir}/error_log.txt", "a") as f:
+                    with open(f"{self.PROJECT_DIR}/error_log.txt", "a") as f:
                         f.write(f"{paper_id}\n {traceback.format_exc()}\n")
                     print("Error converting paper. Moving to fallback pile...")
-                    os.chdir(project_dir)
+                    os.chdir(self.PROJECT_DIR)
                     print(f"Error: Current directory: {os.getcwd()}")
                     if os.path.exists(f"{paper_dir}_pandoc_failure"):
                         sh(f"mv -f {paper_dir} errored/pandoc_failures/")
@@ -571,7 +586,7 @@ class ArxivPapers:
                 print("Error moving paper to fallback pile.")
                 pass
 
-    def convert_tex_manual(self, paper_dir, arxiv_dict):
+    def convert_tex_manual(self, paper_dir):
         """
         Puts papers from fallback_needed/pandoc_failures in a queue to be
         converted with convert_tex_manual. This function is run when pandoc fails
@@ -582,13 +597,12 @@ class ArxivPapers:
         Then, click enter in the terminal to continue.
         """
         fixed_error = False
-        project_dir = os.getcwd()
         paper_id = paper_dir.split("/")[-1]
         while fixed_error == False:
             try:
-                os.chdir(project_dir)
+                os.chdir(self.PROJECT_DIR)
                 sh(f"rm -f {paper_id}_pandoc_failed")
-                main_doc = convert_tex(paper_dir, arxiv_dict, manual_conversion=True)
+                main_doc = self.convert_tex(paper_dir, manual_conversion=True)
             except:
                 print(
                     "Error converting the paper. Please fix the error in the tex file."
@@ -612,12 +626,12 @@ class ArxivPapers:
                     with open(f"{paper_id}.md", "w") as f:
                         f.write(paper_text)
                     fixed_error = True
-                    os.chdir(project_dir)
+                    os.chdir(self.PROJECT_DIR)
                     sh(f"mv {paper_dir}/{paper_id}.md out/{paper_id}.md")
                     break
             if answer == "y":
                 fixed_error = True
-                os.chdir(project_dir)
+                os.chdir(self.PROJECT_DIR)
                 sh(f"mv {paper_dir}/{paper_id}.md out/{paper_id}.md")
                 break
             else:
@@ -629,6 +643,34 @@ class ArxivPapers:
                     "Press enter once you have fixed the error and fixed the tex file."
                 )
                 continue
+
+    def insert_text_in_dict(self, mdfile):
+        if os.path.exists(mdfile):
+            self.arxiv_dict[id]["good_extraction"] = True
+        else:
+            self.arxiv_dict[id]["good_extraction"] = False
+        try:
+            mdfile = mdfile.split("/")[-1]
+            id = mdfile.split("v")[0]
+            with open(f"out/{mdfile}", "r") as f:
+                text = f.read()
+            self.arxiv_dict[id]["text"] = text
+        except ExitCodeError and KeyError:
+            traceback.print_exc()
+            print(f"Error reading {mdfile}")
+
+    def insert_main_tex_in_dict(self, main_tex_name_txt):
+        try:
+            # load main_tex_name_txt
+            with open(f"{main_tex_name_txt}", "r") as f:
+                main_tex_name = f.read()
+            arxiv_id = main_tex_name_txt.split("/")[-1].split("v")[0]
+            self.arxiv_dict[arxiv_id]["main_tex_filename"] = main_tex_name.split("/")[
+                -1
+            ]
+        except ExitCodeError and KeyError:
+            traceback.print_exc()
+            print(f"Error reading {main_tex_name_txt}")
 
     def _create_citations_csv(self):
         """
@@ -663,7 +705,7 @@ class ArxivPapers:
                         os.path.join(path, folder), os.path.join(path, new_folder_name)
                     )
 
-    def _preextract_tar(tar_filepath, input_dir="files", output_dir="tmp"):
+    def _preextract_tar(tar_filepath, output_dir="tmp"):
         """
         Creates tmp/{tar_name} directory and extracts tar files and copies them to tmp/tar_name/*.
         Creates tmp/done_{tar_name} file to signal copy_tar that extraction is done.
@@ -681,7 +723,7 @@ class ArxivPapers:
         paper_id = paper_dir_path.split("/")[-1]
         try:
             # load arxiv_citations_dict json to add citations to paper_id
-            arxiv_citations_dict = json.load(open("arxiv_citations_dict.json"))
+            self.arxiv_citations_dict = json.load(open("arxiv_citations_dict.json"))
             try:
                 for doc in lsr(paper_dir_path):
                     if doc.endswith(".gz"):
@@ -709,28 +751,30 @@ class ArxivPapers:
 
                     elif doc.endswith(".bbl") or doc.endswith(".bib"):
                         # if bbl, extract arxiv ids from citations, add to list, and delete bbl
-                        arxiv_citations, bibliography = get_arxiv_ids(doc)
+                        arxiv_citations, bibliography = self._get_arxiv_ids(doc)
                         if len(arxiv_citations) > 0:
                             for arxiv_id in arxiv_citations:
-                                if arxiv_citations_dict.get(paper_id) is None:
-                                    arxiv_citations_dict[paper_id] = {arxiv_id: True}
+                                if self.arxiv_citations_dict.get(paper_id) is None:
+                                    self.arxiv_citations_dict[paper_id] = {
+                                        arxiv_id: True
+                                    }
                                 else:
-                                    arxiv_citations_dict[paper_id].update(
+                                    self.arxiv_citations_dict[paper_id].update(
                                         {arxiv_id: True}
                                     )
                             json.dump(
-                                arxiv_citations_dict,
+                                self.arxiv_citations_dict,
                                 open("arxiv_citations_dict.json", "w"),
                             )
                             id = paper_id.split("v")[0]  # remove version number
-                            arxiv_dict[id]["arxiv_citations"] = arxiv_citations_dict[
-                                paper_id
-                            ]
+                            self.arxiv_dict[id][
+                                "arxiv_citations"
+                            ] = self.arxiv_citations_dict[paper_id]
                         if doc.endswith(".bbl"):
-                            arxiv_dict[id]["bibliography_bbl"] = bibliography
+                            self.arxiv_dict[id]["bibliography_bbl"] = bibliography
                         elif doc.endswith(".bib"):
-                            arxiv_dict[id]["bibliography_bib"] = bibliography
-                        json.dump(arxiv_dict, open("arxiv_dict.json", "w"))
+                            self.arxiv_dict[id]["bibliography_bib"] = bibliography
+                        json.dump(self.arxiv_dict, open("arxiv_dict.json", "w"))
 
                     # check if filename has no extension, this is likely a .tex file
                     # if so, add .tex to the filename
@@ -784,7 +828,7 @@ class ArxivPapers:
                 try:
                     with open(doc, "rb") as fh:
                         b = fh.read()
-                        cont = any_to_utf8(b)
+                        cont = self._any_to_utf8(b)
                         if cont is None:
                             return
                     fwrite(doc, cont)
@@ -824,7 +868,7 @@ class ArxivPapers:
 
     def _mv_empty_mds(self):
         sh("mkdir -p fallback_needed/empty_mds")
-        empty_files, files = count_empty_mds("out")
+        empty_files, files = self._count_empty_mds("out")
         num_empty_files = len(empty_files)
         print(f"{num_empty_files} empty files out of {len(files)}")
         print(empty_files)
@@ -836,25 +880,25 @@ class ArxivPapers:
 
         print("Done moving empty files to fallback_needed/empty_mds")
 
-    def _remove_empty_mds_from_dict(self, arxiv_dict):
+    def _remove_empty_mds_from_dict(self):
         empty_mds = [
             empty_md.split("/")[-1][:-2] for empty_md in ls("fallback_needed/empty_mds")
         ]
         print("Removing the following papers from dict since the contents are empty: ")
         print(empty_mds)
         for empty_md in empty_mds:
-            arxiv_dict.pop(empty_md, None)
-        return arxiv_dict
+            self.arxiv_dict.pop(empty_md, None)
+        return self.arxiv_dict
 
-    def _remove_empty_texts_from_dict(self, arxiv_dict):
-        total_papers = len(arxiv_dict)
+    def _remove_empty_texts_from_dict(self):
+        total_papers = len(self.arxiv_dict)
         removed_papers = 0
-        for paper in arxiv_dict:
+        for paper in self.arxiv_dict:
             if len(paper["text"]) < 500 and paper["main_tex_filename"] != "":
                 removed_papers += 1
-                arxiv_dict.pop(paper["id"], None)
+                self.arxiv_dict.pop(paper["id"], None)
         print(f"{removed_papers} out of {total_papers} papers removed")
-        return arxiv_dict
+        return self.arxiv_dict
 
     def _filenames_to_ignore(self):
         ignore_list_title = [
@@ -917,10 +961,10 @@ class ArxivPapers:
             "Supp",
         ]
 
-        ignore_list = _modify_caps(ignore_list_title)
+        ignore_list = self._modify_caps(ignore_list_title)
         df_ignore = pd.DataFrame(ignore_list)
         df_ignore.to_csv("ignore_filenames.csv", index=False, header=False)
-        ignore_dict = _csv_to_dict("ignore_filenames.csv")
+        ignore_dict = self._csv_to_dict("ignore_filenames.csv")
         if "Approached" in ignore_dict:
             print("Approach is in ignore_dict")
         else:
@@ -929,78 +973,24 @@ class ArxivPapers:
         with open("ignore_dict.pkl", "wb") as f:
             pickle.dump(ignore_dict, f)
 
-        def _modify_caps(ignore_list_title):
-            ignore_list_lower = []
-            for item in ignore_list_title:
-                ignore_list_lower.append(f"{item.lower()}.tex")
-            return ignore_list_lower
+    def _modify_caps(ignore_list_title):
+        ignore_list_lower = []
+        for item in ignore_list_title:
+            ignore_list_lower.append(f"{item.lower()}.tex")
+        return ignore_list_lower
 
-        def _csv_to_dict(csv_file):
-            """
-            Opens a csv file and returns a dictionary of the contents.
-            """
-            with open(csv_file) as f:
-                ignore_dict = {}
-                reader = csv.reader(f)
-                for row in reader:
-                    ignore_dict[row[0]] = True
-                return ignore_dict
+    def _csv_to_dict(csv_file):
+        """
+        Opens a csv file and returns a dictionary of the contents.
+        """
+        with open(csv_file) as f:
+            ignore_dict = {}
+            reader = csv.reader(f)
+            for row in reader:
+                ignore_dict[row[0]] = True
+            return ignore_dict
 
 
 if __name__ == "__main__":
 
-    arxiv_extractor = ArxivPapers()
-
-    mv_empty_mds()
-
-    # TODO: Make the pandoc conversion work with multiprocessing
-    # with mp.Manager() as manager:
-    #     d = manager.dict()
-    #     d.update(arxiv_dict)
-    #     with manager.Pool() as pool:
-    #         print(paper_folders)
-    #         print(len(paper_folders))
-    #         pool.starmap(convert_tex, zip(paper_folders, repeat(d, len(paper_folders))))
-    # `d` is a DictProxy object that can be converted to dict
-    # pprint.pprint(dict(d))
-
-    # pool.map(convert_tex, paper_folders, initargs=(arxiv_dict,))
-    # pool.close()
-    # pool.join()
-
-    print("Finished converting all papers.")
-    print("Updating arxiv_dict.json...")
-    # loop through files in out/ and outtxt/ and add to arxiv_dict
-    for i, mdfile in enumerate(tqdm(ls("out"))):
-        print(f"{i}/{len(ls('out'))}")
-        if os.path.exists(mdfile):
-            arxiv_dict[id]["good_extraction"] = True
-        else:
-            arxiv_dict[id]["good_extraction"] = False
-        try:
-            mdfile = mdfile.split("/")[-1]
-            id = mdfile.split("v")[0]
-            with open(f"out/{mdfile}", "r") as f:
-                text = f.read()
-            arxiv_dict[id]["text"] = text
-        except ExitCodeError and KeyError:
-            traceback.print_exc()
-            print(f"Error reading {mdfile}")
-
-    for i, main_tex_name_txt in enumerate(tqdm(ls("outtxt"))):
-        print(f"{i}/{len(ls('outtxt'))}")
-        try:
-            # load main_tex_name_txt
-            with open(f"{main_tex_name_txt}", "r") as f:
-                main_tex_name = f.read()
-            arxiv_id = main_tex_name_txt.split("/")[-1].split("v")[0]
-            arxiv_dict[arxiv_id]["main_tex_filename"] = main_tex_name.split("/")[-1]
-        except ExitCodeError and KeyError:
-            traceback.print_exc()
-            print(f"Error reading {main_tex_name_txt}")
-
-    if remove_empty_papers == "y":
-        arxiv_dict = remove_empty_mds_from_dict(arxiv_dict)
-        arxiv_dict = remove_empty_texts_from_dict(arxiv_dict)
-    json.dump(arxiv_dict, open("arxiv_dict_updated.json", "w"))
-    print("Finished updating arxiv_dict_updated.json.")
+    ArxivPapers().fetch_entries()
