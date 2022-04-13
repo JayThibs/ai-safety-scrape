@@ -17,6 +17,7 @@ mime = magic.Magic(mime=True)
 from tqdm import tqdm
 import json
 import pandas as pd
+import csv
 import traceback
 from pathlib import Path
 import multiprocessing as mp
@@ -324,6 +325,7 @@ class ArxivPapers:
                 traceback.print_exc()
 
     def convert_tex(
+        self,
         paper_dir,
         arxiv_dict,
         output_dir="out",
@@ -569,7 +571,7 @@ class ArxivPapers:
                 print("Error moving paper to fallback pile.")
                 pass
 
-    def convert_tex_manual(paper_dir, arxiv_dict):
+    def convert_tex_manual(self, paper_dir, arxiv_dict):
         """
         Puts papers from fallback_needed/pandoc_failures in a queue to be
         converted with convert_tex_manual. This function is run when pandoc fails
@@ -760,7 +762,7 @@ class ArxivPapers:
             if doc.endswith(".sty"):
                 sh(f"rm {doc}")
 
-    def _any_to_utf8(b):
+    def _any_to_utf8(self, b):
         """Detects encoding and converts to utf-8."""
         try:
             return b.decode("utf-8")
@@ -775,7 +777,7 @@ class ArxivPapers:
                 # still cant figure out encoding, give up
                 return
 
-    def _convert_to_utf8(rootdir="."):
+    def _convert_to_utf8(self, rootdir="."):
         """Converts all files in root folder to utf-8."""
         for doc in ls(rootdir):
             if doc.endswith(".tex"):
@@ -791,7 +793,7 @@ class ArxivPapers:
                     print(f"Error converting {doc}, will go to /fallback_needed.")
                     print("Error converting files to utf-8.")
 
-    def _mv_files_to_root(rootdir="tmp"):
+    def _mv_files_to_root(self, rootdir="tmp"):
         """Moves all files in root folder subdirectories to root folder."""
         for doc in ls(rootdir):
             try:
@@ -804,10 +806,145 @@ class ArxivPapers:
                     "Error moving files to root folder. Likely because there's a file with the same name in the root folder."
                 )
 
-    def _get_arxiv_ids(bib_file_path):
+    def _get_arxiv_ids(self, bib_file_path):
         with open(bib_file_path, "r") as f:
             bib_string = f.read()
         return re.findall(r"(?:arXiv:|abs/)(\d{4}\.\d{4,5})", bib_string), bib_string
+
+    def _count_empty_mds(self, paper_dir):
+        files = ls(paper_dir)
+        empty_files = []
+        for file in files:
+            file.split(".")[-1]
+            if file.endswith(".md"):
+                if os.stat(file).st_size == 0:
+                    empty_files.append(file)
+
+        return empty_files, files
+
+    def _mv_empty_mds(self):
+        sh("mkdir -p fallback_needed/empty_mds")
+        empty_files, files = count_empty_mds("out")
+        num_empty_files = len(empty_files)
+        print(f"{num_empty_files} empty files out of {len(files)}")
+        print(empty_files)
+
+        for file in empty_files:
+            folder = "done/" + file.split("/")[-1][:-3] + "/"
+            sh(f"mv {file} {folder}")
+            sh(f"mv {folder} fallback_needed/empty_mds/")
+
+        print("Done moving empty files to fallback_needed/empty_mds")
+
+    def _remove_empty_mds_from_dict(self, arxiv_dict):
+        empty_mds = [
+            empty_md.split("/")[-1][:-2] for empty_md in ls("fallback_needed/empty_mds")
+        ]
+        print("Removing the following papers from dict since the contents are empty: ")
+        print(empty_mds)
+        for empty_md in empty_mds:
+            arxiv_dict.pop(empty_md, None)
+        return arxiv_dict
+
+    def _remove_empty_texts_from_dict(self, arxiv_dict):
+        total_papers = len(arxiv_dict)
+        removed_papers = 0
+        for paper in arxiv_dict:
+            if len(paper["text"]) < 500 and paper["main_tex_filename"] != "":
+                removed_papers += 1
+                arxiv_dict.pop(paper["id"], None)
+        print(f"{removed_papers} out of {total_papers} papers removed")
+        return arxiv_dict
+
+    def _filenames_to_ignore(self):
+        ignore_list_title = [
+            "Approach",
+            "Conclusion",
+            "Experiments",
+            "Figures",
+            "Implementation",
+            "Appendix",
+            "Introduction",
+            "Preliminaries",
+            "Problem",
+            "RelatedWork",
+            "RelatedWorks",
+            "Related",
+            "Background",
+            "Methods",
+            "math_commands",
+            "Results",
+            "Supplement",
+            "Abstract",
+            "Discussion",
+            "Evaluation",
+            "Methodology",
+            "mathcommands",
+            "Prelim",
+            "Related_Work",
+            "Method",
+            "Intro",
+            "Proofs",
+            "Macros",
+            "Pseudocode",
+            "Conc",
+            "Exp",
+            "Symbol",
+            "Custom",
+            "Packages",
+            "Glossary",
+            "Experiment",
+            "Dataset",
+            "Model",
+            "Concl",
+            "Experim",
+            "Acks",
+            "Data",
+            "Metrics",
+            "Train",
+            "Defs",
+            "Defn",
+            "Comments",
+            "Acknowledgements",
+            "Analysis",
+            "Summary",
+            "Background",
+            "Theory",
+            "Abbrev",
+            "Plots",
+            "Datasheet",
+            "References",
+            "Supp",
+        ]
+
+        ignore_list = _modify_caps(ignore_list_title)
+        df_ignore = pd.DataFrame(ignore_list)
+        df_ignore.to_csv("ignore_filenames.csv", index=False, header=False)
+        ignore_dict = _csv_to_dict("ignore_filenames.csv")
+        if "Approached" in ignore_dict:
+            print("Approach is in ignore_dict")
+        else:
+            print("Approach is not in ignore_dict")
+
+        with open("ignore_dict.pkl", "wb") as f:
+            pickle.dump(ignore_dict, f)
+
+        def _modify_caps(ignore_list_title):
+            ignore_list_lower = []
+            for item in ignore_list_title:
+                ignore_list_lower.append(f"{item.lower()}.tex")
+            return ignore_list_lower
+
+        def _csv_to_dict(csv_file):
+            """
+            Opens a csv file and returns a dictionary of the contents.
+            """
+            with open(csv_file) as f:
+                ignore_dict = {}
+                reader = csv.reader(f)
+                for row in reader:
+                    ignore_dict[row[0]] = True
+                return ignore_dict
 
 
 if __name__ == "__main__":
