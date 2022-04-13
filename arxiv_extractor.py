@@ -19,18 +19,22 @@ import traceback
 from pathlib import Path
 
 
-class ArxivExtractor:
-    def __init__(self):
-        self.setup()
+class ArxivPapers:
+    def __init__(self, papers_csv_path="ai-alignment-papers.csv"):
+        self.papers_csv_path = papers_csv_path
 
     def fetch_entries(self):
         """
         Fetch all the arxiv entries from the arxiv API.
         """
+        print("Setting up directory structure...")
+        self.setup()
         print("Downloading all source files for arxiv entries...")
-        self.arxiv_dict = download_arxiv_paper_tars(
-            citation_level=self.citation_level, arxiv_dict=self.arxiv_dict
-        )
+        dl_papers_answer = input("Download papers? (y/n): ")
+        if dl_papers_answer == "y":
+            self.arxiv_dict = download_arxiv_paper_tars(
+                citation_level=self.citation_level, arxiv_dict=self.arxiv_dict
+            )
         print("Extracting text and citations from arxiv entries...")
 
         mv_empty_mds()
@@ -39,6 +43,7 @@ class ArxivExtractor:
         print("Done extracting text and citations from arxiv entries.")
 
     def download_arxiv_paper_tars(
+        self,
         citation_level="0",
         arxiv_dict={},
         create_dict_only=False,
@@ -50,7 +55,7 @@ class ArxivExtractor:
             create_dict_only: True or False
         """
         if citation_level == "0":
-            df = pd.read_csv("ai-alignment-papers.csv", index_col=0)
+            df = pd.read_csv(self.papers_csv_path, index_col=0)
             df_arxiv = df[df["Url"].str.contains("arxiv") == True]
             papers = list(set(df_arxiv["Url"].values))
             print(f"{len(papers)} papers to download")
@@ -61,9 +66,11 @@ class ArxivExtractor:
 
         tars = ["None"] * len(papers)
 
-        if ls(TARS_DIR):
+        if ls(self.TARS_DIR):
             tars = [
-                tar.split("/")[-1] for tar in ls(TARS_DIR) if tar.endswith(".tar.gz")
+                tar.split("/")[-1]
+                for tar in ls(self.TARS_DIR)
+                if tar.endswith(".tar.gz")
             ]
             if len(tars) != len(papers):
                 # extend the tars list to match the length of the papers list
@@ -75,7 +82,10 @@ class ArxivExtractor:
             paper_link = str(paper_link)
             filename = str(filename)
             paper_id = ".".join(filename.split(".")[:2])
-            if os.path.exists(str(TARS_DIR / filename)) and create_dict_only == False:
+            if (
+                os.path.exists(str(self.TARS_DIR / filename))
+                and create_dict_only == False
+            ):
                 print("Already downloaded the " + paper_id + " tar file.")
                 continue
 
@@ -123,7 +133,7 @@ class ArxivExtractor:
                 pass
 
             try:
-                paper.download_source(dirpath=str(TARS_DIR), filename=tar_filename)
+                paper.download_source(dirpath=str(self.TARS_DIR), filename=tar_filename)
                 print("; Downloaded paper: " + paper_id)
             except:
                 print("; Could not download paper: " + paper_id)
@@ -140,13 +150,13 @@ class ArxivExtractor:
         with open("arxiv_dict.json", "w") as fp:
             json.dump(arxiv_dict, fp)
 
-        with open(PKLS_DIR / "arxiv_paper_tars_list.pkl", "wb") as f:
+        with open(self.PKLS_DIR / "arxiv_paper_tars_list.pkl", "wb") as f:
             pickle.dump(tars, f)
 
-        with open(PKLS_DIR / "incorrect_links_ids_list.pkl", "wb") as f:
+        with open(self.PKLS_DIR / "incorrect_links_ids_list.pkl", "wb") as f:
             pickle.dump(incorrect_links_ids, f)
 
-        with open(PKLS_DIR / "paper_dl_failures_list.pkl", "wb") as f:
+        with open(self.PKLS_DIR / "paper_dl_failures_list.pkl", "wb") as f:
             pickle.dump(paper_dl_failures, f)
 
         return arxiv_dict
@@ -247,7 +257,7 @@ class ArxivExtractor:
             )
             print(f"Saved CSV of all citations at level {self.citation_level}.")
 
-    def _fix_chars_in_dirs(parent):
+    def _fix_chars_in_dirs(self, parent):
         for path, folders, files in os.walk(parent):
             for f in files:
                 os.rename(
@@ -262,7 +272,7 @@ class ArxivExtractor:
                         os.path.join(path, folder), os.path.join(path, new_folder_name)
                     )
 
-    def _prepare_extracted_tars(paper_dir_path):
+    def _prepare_extracted_tars(self, paper_dir_path):
         # extracts tar files to tmp/{dump_name}/*
         paper_id = paper_dir_path.split("/")[-1]
         try:
@@ -342,7 +352,7 @@ class ArxivExtractor:
             traceback.print_exc()
             print(f"Error deleting files in {paper_id}")
 
-    def _delete_style_files(paper_dir_path):
+    def _delete_style_files(self, paper_dir_path):
         # delete all files with .sty extension
         for doc in lsr(paper_dir_path):
             if doc.endswith(".sty"):
@@ -351,13 +361,8 @@ class ArxivExtractor:
 
 if __name__ == "__main__":
 
-    arxiv_extractor = ArxivExtractor()
+    arxiv_extractor = ArxivPapers()
 
-    dl_papers_answer = input("Download papers? (y/n): ")
-    if dl_papers_answer == "y":
-        arxiv_dict = download_arxiv_paper_tars(
-            citation_level=citation_level, arxiv_dict=arxiv_dict
-        )
     if ls("files") == []:
         sh(f"mv {TARS_DIR}/* files/")
 
