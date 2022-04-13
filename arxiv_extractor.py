@@ -19,34 +19,9 @@ import traceback
 from pathlib import Path
 
 
-project_dir = os.getcwd()
-
-
 class ArxivExtractor:
-    def __init__(self, citation_level: str):
-        if os.path.exists("arxiv_dict_updated.json"):
-            self.arxiv_dict = json.load(open("arxiv_dict_updated.json"))
-        else:
-            self.arxiv_dict = {}
-
-        self.citation_level = citation_level
-
-        # arxiv_citations_dict looks like this:
-        # {root_paper_id_1: [citation_paper_id_1, citation_paper_id_2, ...], ...}
-        # root_paper_id_2: [citation_paper_id_1, citation_paper_id_2, ...], ...}
-        # The dictionary is updated in the prepare_extracted_tars function.
-        if os.path.exists("arxiv_citations_dict.json"):
-            self.arxiv_citations_dict = json.load(open("arxiv_citations_dict.json"))
-        else:
-            self.arxiv_citations_dict = {}
-            json.dump(self.arxiv_citations_dict, open("arxiv_citations_dict.json", "w"))
-
-        if not os.path.exists("ignore_dict.pkl"):
-            sh("python filenames_to_ignore.py")
-
-        delete_unwanted_files = input("Delete unwanted files? (y/n) ")
-        if delete_unwanted_files == "y":
-            sh("rm -rf files")
+    def __init__(self):
+        self.setup()
 
     def fetch_entries(self):
         """
@@ -176,20 +151,40 @@ class ArxivExtractor:
 
         return arxiv_dict
 
-    def _setup(self):
+    def setup(self):
 
-        PROJECT_DIR = os.getcwd()
-        RAW_DIR = Path("data/raw")
-        INTERIM_DIR = Path("data/interim")
-        PROCESSED_DIR = Path("data/processed")
-        TARS_DIR = RAW_DIR / "tars"
-        LATEX_DIR = RAW_DIR / "latex_files"
-        PDFS_DIR = RAW_DIR / "pdfs"
-        PKLS_DIR = INTERIM_DIR / "pkls"
-        EXTRACTED_TARS_DIR = INTERIM_DIR / "extracted_tars"
-        MERGE_TEX_DIR = INTERIM_DIR / "merge_latex_files"
-        PROCESSED_TXTS_DIR = PROCESSED_DIR / "txts"
-        PROCESSED_JSONS_DIR = PROCESSED_DIR / "jsons"
+        self.PROJECT_DIR = os.getcwd()
+        self.RAW_DIR = Path("data/raw")
+        self.INTERIM_DIR = Path("data/interim")
+        self.PROCESSED_DIR = Path("data/processed")
+        self.TARS_DIR = self.RAW_DIR / "tars"
+        self.LATEX_DIR = self.RAW_DIR / "latex_files"
+        self.PDFS_DIR = self.INTERIM_DIR / "pdfs"
+        self.PKLS_DIR = self.INTERIM_DIR / "pkls"
+        self.PROCESSED_TXTS_DIR = self.PROCESSED_DIR / "txts"
+        self.PROCESSED_JSONS_DIR = self.PROCESSED_DIR / "jsons"
+
+        if os.path.exists("arxiv_dict_updated.json"):
+            self.arxiv_dict = json.load(open("arxiv_dict_updated.json"))
+        else:
+            self.arxiv_dict = {}
+
+        # arxiv_citations_dict looks like this:
+        # {root_paper_id_1: [citation_paper_id_1, citation_paper_id_2, ...], ...}
+        # root_paper_id_2: [citation_paper_id_1, citation_paper_id_2, ...], ...}
+        # The dictionary is updated in the prepare_extracted_tars function.
+        if os.path.exists("arxiv_citations_dict.json"):
+            self.arxiv_citations_dict = json.load(open("arxiv_citations_dict.json"))
+        else:
+            self.arxiv_citations_dict = {}
+            json.dump(self.arxiv_citations_dict, open("arxiv_citations_dict.json", "w"))
+
+        if not os.path.exists("ignore_dict.pkl"):
+            sh("python filenames_to_ignore.py")
+
+        delete_unwanted_files = input("Delete unwanted files? (y/n) ")
+        if delete_unwanted_files == "y":
+            sh("rm -rf files")
 
         # Delete contents before starting?
         # This is useful when you are testing and want to start from scratch
@@ -197,7 +192,7 @@ class ArxivExtractor:
         if delete_contents == "y":
             are_you_sure = input("Are you sure? (y/n) ")
             if are_you_sure == "y":
-                sh(f"rm -rf files errored fallback_needed {TARS_DIR}/")
+                sh(f"rm -rf files errored fallback_needed {self.TARS_DIR}/")
         self.automatic_mode = input("Automatic mode? (y/n): ")
 
         self.citation_level = str(
@@ -218,10 +213,10 @@ class ArxivExtractor:
             "mkdir -p fallback_needed/unknown_main_tex fallback_needed/pdf_only errored/pandoc_failures errored/unknown_errors"
         )
         sh(
-            f"mkdir -p {RAW_DIR} {INTERIM_DIR} {PROCESSED_DIR} {TARS_DIR} {LATEX_DIR} {PDFS_DIR}"
+            f"mkdir -p {self.RAW_DIR} {self.INTERIM_DIR} {self.PROCESSED_DIR} {self.TARS_DIR} {self.LATEX_DIR} {self.PDFS_DIR}"
         )
         sh(
-            f"mkdir -p {PKLS_DIR} {EXTRACTED_TARS_DIR} {MERGE_TEX_DIR} {PROCESSED_TXTS_DIR} {PROCESSED_JSONS_DIR}"
+            f"mkdir -p {self.PKLS_DIR} {self.PROCESSED_TXTS_DIR} {self.PROCESSED_JSONS_DIR}"
         )
         # Automatic Mode will go through all the papers in files and try
         # to convert them to markdown.
@@ -232,20 +227,25 @@ class ArxivExtractor:
                 sh("mv out/* data/processed/txts/")
                 sh("mv outtxt/* data/processed/txts/")
 
+        self._create_citations_csv()
+
     def _create_citations_csv(self):
         """
         Create a csv file with all the arxiv citations for each paper.
         """
-        print(
-            f"Citation level is {citation_level}, so we'll create a CSV of the papers at that citation level."
-        )
-        all_citations = {}
-        for paper_id in arxiv_citations_dict.keys():
-            for citation in arxiv_citations_dict[paper_id].keys():
-                all_citations[citation] = True
-        all_citations = pd.DataFrame(list(all_citations.keys()))
-        all_citations.to_csv(f"all_citations_level_{citation_level}.csv", index=False)
-        print(f"Saved CSV of all citations at level {citation_level}.")
+        if self.citation_level != "0":
+            print(
+                f"Citation level is {self.citation_level}, so we'll create a CSV of the papers at that citation level."
+            )
+            all_citations = {}
+            for paper_id in self.arxiv_citations_dict.keys():
+                for citation in self.arxiv_citations_dict[paper_id].keys():
+                    all_citations[citation] = True
+            all_citations = pd.DataFrame(list(all_citations.keys()))
+            all_citations.to_csv(
+                f"all_citations_level_{self.citation_level}.csv", index=False
+            )
+            print(f"Saved CSV of all citations at level {self.citation_level}.")
 
     def _fix_chars_in_dirs(parent):
         for path, folders, files in os.walk(parent):
