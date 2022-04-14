@@ -1,19 +1,20 @@
 import os
 import re
+import csv
+import json
+import jsonlines
 import chardet
-import arxiv
+import pandas as pd
 import pickle
-from utils import *
 import magic
 
 mime = magic.Magic(mime=True)
 from tqdm import tqdm
-import json
-import pandas as pd
-import csv
 import traceback
 from pathlib import Path
 import multiprocessing as mp
+from utils import *
+import arxiv
 
 
 class ArxivPapers:
@@ -33,11 +34,11 @@ class ArxivPapers:
         if ls("files") == []:
             sh(f"mv {self.TARS_DIR}/* files/")
         print("Extracting text and citations from arxiv entries...")
-
+        self.automatic_mode_done = False
         if self.automatic_mode == "y":
             self.automatic_extraction()
-
-        if self.automatic_mode != "y":
+        self.automatic_mode_done = True
+        if self.manual_mode == "y":
             self.manual_extraction()
 
         self._mv_empty_mds()
@@ -55,15 +56,32 @@ class ArxivPapers:
             self.insert_main_tex_in_dict(main_tex_name_txt)
 
         if self.remove_empty_papers == "y":
-            arxiv_dict = self._remove_empty_mds_from_dict(arxiv_dict)
-            arxiv_dict = self._remove_empty_texts_from_dict(arxiv_dict)
-        json.dump(arxiv_dict, open("arxiv_dict_updated.json", "w"))
+            self.arxiv_dict = self._remove_empty_mds_from_dict(self.arxiv_dict)
+            self.arxiv_dict = self._remove_empty_texts_from_dict(self.arxiv_dict)
+        json.dump(self.arxiv_dict, open("arxiv_dict_updated.json", "w"))
         print("Finished updating arxiv_dict_updated.json.")
 
-        delete_unwanted_files = input(
-            "Delete unwanted files (only keep .jsonl and main .txt files)? (y/n) "
-        )
+        self.arxiv_list_of_dicts = []
+        for paper_id in tqdm(self.arxiv_dict.keys()):
+            self.arxiv_list_of_dicts.append(self.arxiv_dict[paper_id])
+        json.dump(self.arxiv_list_of_dicts, open("arxiv_list_of_dicts.json", "w"))
 
+        if os.path.exists("data/arxiv.jsonl"):
+            os.remove("data/arxiv.jsonl")
+            os.remove("data/arxiv.txt")
+
+        print("Converting arxiv_dict_updated.json to arxiv.jsonl and arxiv.txt...")
+        for i, paper in enumerate(self.arxiv_list_of_dicts):
+            i = str(i)
+            with jsonlines.open("data/arxiv.jsonl", "a") as writer:
+                writer.write(paper)
+            with open("data/arxiv.txt", "a") as f:
+                f.write(f"[ENTRY {i}] \n\n {paper['text']} \n\n")
+
+        # delete_unwanted_files = input(
+        #     "Delete unwanted files (only keep .jsonl and main .txt files)? (y/n) "
+        # )
+        delete_unwanted_files = "n"
         if delete_unwanted_files == "y":
             sh(
                 "rm -rf tmp files done out outtxt errored fallback_needed data/interim data/raw"
@@ -107,14 +125,24 @@ class ArxivPapers:
             are_you_sure = input("Are you sure? (y/n) ")
             if are_you_sure == "y":
                 sh(f"rm -rf files errored fallback_needed {self.TARS_DIR}/")
-        self.automatic_mode = input("Automatic mode? (y/n): ")
-
+        self.automatic_mode = input(
+            "Automatic mode (extracts as many papers it can automatically)? (y/n): "
+        )
+        self.manual_mode = input(
+            "Manual mode (allows manually extract the failed extractions by fixing the .tex files, giving the correct main tex filename or using detex instead of pandoc for the extraction)? (y/n): "
+        )
         self.citation_level = str(
             input(
                 "Citation level? (0 = original, 1 = citation of original, 2 = citation of citation, etc.): "
             )
         )
         self.remove_empty_papers = "y"  # replace with input() later
+
+        # TODO: add option to remove empty papers
+        #
+        #
+        #
+        #
         if self.citation_level != "0":
             pass
 
@@ -326,9 +354,7 @@ class ArxivPapers:
                 print(f'Converting errored papers: "{paper_folder}"')
                 os.chdir(self.PROJECT_DIR)
                 paper_folder = os.getcwd() + "/" + paper_folder
-                self.convert_tex_manual(
-                    paper_dir=paper_folder, arxiv_dict=self.arxiv_dict
-                )
+                self.convert_tex_manual(paper_dir=paper_folder)
                 sh(f"mv {paper_folder} done")
             except ExitCodeError:
                 traceback.print_exc()
@@ -561,8 +587,23 @@ class ArxivPapers:
                         print(
                             f"{paper_id} main filename not found in main_tex_dict, sending to fallback_needed"
                         )
-                        os.chdir(self.PROJECT_DIR)
-                        sh(f"mv -f {paper_dir} fallback_needed/unknown_main_tex/")
+                        if self.automatic_mode_done == False:
+                            os.chdir(self.PROJECT_DIR)
+                            sh(f"mv -f {paper_dir} fallback_needed/unknown_main_tex/")
+                        else:
+                            print(
+                                "The main tex filename is unknown, please type and enter the filename manually. Here are the possible files:"
+                            )
+                            print(matched_list)
+                            main_tex = input("Please enter the main tex filename: ")
+                            self.arxiv_dict[paper_id]["main_tex_filename"] = main_tex
+                            os.chdir(self.PROJECT_DIR)
+                            json.dump(
+                                self.arxiv_dict,
+                                open(
+                                    f"{self.PROCESSED_JSONS_DIR}/arxiv_dict.json", "w"
+                                ),
+                            )
                         return
 
         except:
