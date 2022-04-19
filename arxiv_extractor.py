@@ -37,6 +37,7 @@ class ArxivPapers:
         self.automatic_mode_done = False
         if self.automatic_mode == "y":
             self.automatic_extraction()
+            sh(f"rm -rf tmp && mkdir tmp")
         self.automatic_mode_done = True
         if self.manual_mode == "y":
             self.manual_extraction()
@@ -339,17 +340,16 @@ class ArxivPapers:
                 print(f"Error converting {paper_folder}")
 
     def manual_extraction(self):
-        if ls("tmp") == []:
-            for paper_folder in ls("errored/pandoc_failures/"):
-                if os.path.isdir(paper_folder):
-                    sh(f"mv {paper_folder} tmp")
-        pandoc_failures = ls("tmp")
-        for paper_folder in pandoc_failures:
+        for paper_folder in ls("errored/pandoc_failures/"):
+            if os.path.isdir(paper_folder):
+                sh(f"mv {paper_folder} tmp")
+        failed_papers = ls("tmp")
+        for paper_folder in failed_papers:
             if os.path.isdir(paper_folder):
                 for file in ls(paper_folder):
                     if file.endswith("_failed"):
                         sh(f"rm {file}")
-        for paper_folder in tqdm(pandoc_failures):
+        for paper_folder in tqdm(failed_papers):
             try:
                 print(f'Converting errored papers: "{paper_folder}"')
                 os.chdir(self.PROJECT_DIR)
@@ -418,10 +418,10 @@ class ArxivPapers:
             if root_tex_files == 1:
                 # if there is only one tex file, use it
                 sh(
-                    f"if ! timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none; then touch {paper_id}_pandoc_failed; fi"
+                    f"if ! timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none; then touch {paper_id}_pandoc_failure; fi"
                 )
                 if (
-                    os.path.exists(f"{paper_id}_pandoc_failed")
+                    os.path.exists(f"{paper_id}_pandoc_failure")
                     and not manual_conversion
                 ):
                     print(f"{paper_id} failed to convert with pandoc.")
@@ -436,7 +436,8 @@ class ArxivPapers:
                 self.arxiv_dict[number_id]["text"] = paper_text
                 self.arxiv_dict[number_id]["main_tex_filename"] = main_doc
                 json.dump(
-                    self.arxiv_dict, open(f"{self.PROJECT_DIR}/arxiv_dict.json", "w")
+                    self.arxiv_dict,
+                    open(f"{self.PROCESSED_JSONS_DIR}/arxiv_dict.json", "w"),
                 )
                 os.chdir(self.PROJECT_DIR)
                 sh(f"mv {paper_dir}/{paper_id}.md {output_dir}/{paper_id}.md")
@@ -481,10 +482,10 @@ class ArxivPapers:
                     main_doc = matched_list[0]
                     # change to that directory and use the common file name
                     sh(
-                        f"if ! timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none; then touch {paper_id}_pandoc_failed; fi"
+                        f"if ! timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none; then touch {paper_id}_pandoc_failure; fi"
                     )
                     if (
-                        os.path.exists(f"{paper_id}_pandoc_failed")
+                        os.path.exists(f"{paper_id}_pandoc_failure")
                         and not manual_conversion
                     ):
                         print(f"{paper_id} failed to convert with pandoc.")
@@ -500,7 +501,7 @@ class ArxivPapers:
                     self.arxiv_dict[number_id]["main_tex_filename"] = main_doc
                     json.dump(
                         self.arxiv_dict,
-                        open(f"{self.PROJECT_DIR}/arxiv_dict.json", "w"),
+                        open(f"{self.PROCESSED_JSONS_DIR}/arxiv_dict.json", "w"),
                     )
                     # go back to root
                     os.chdir(self.PROJECT_DIR)
@@ -524,10 +525,10 @@ class ArxivPapers:
                         main_doc = matched_list[0]
                         # change to that directory and use the common file name
                         sh(
-                            f"if ! timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none; then touch {paper_id}_pandoc_failed; fi"
+                            f"if ! timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none; then touch {paper_id}_pandoc_failure; fi"
                         )
                         if (
-                            os.path.exists(f"{paper_id}_pandoc_failed")
+                            os.path.exists(f"{paper_id}_pandoc_failure")
                             and not manual_conversion
                         ):
                             print(f"{paper_id} failed to convert with pandoc.")
@@ -543,7 +544,7 @@ class ArxivPapers:
                         self.arxiv_dict[number_id]["main_tex_filename"] = main_doc
                         json.dump(
                             self.arxiv_dict,
-                            open(f"{self.PROJECT_DIR}/arxiv_dict.json", "w"),
+                            open(f"{self.PROCESSED_JSONS_DIR}/arxiv_dict.json", "w"),
                         )
                         # go back to root
                         os.chdir(self.PROJECT_DIR)
@@ -557,10 +558,10 @@ class ArxivPapers:
                         # arxiv_dict is created when we need to use convert_tex_semiauto and manually inputting main tex filename
                         main_tex = self.arxiv_dict[number_id]["main_tex_filename"]
                         sh(
-                            f"if ! timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none; then touch {paper_id}_pandoc_failed; fi"
+                            f"if ! timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none; then touch {paper_id}_pandoc_failure; fi"
                         )
                         if (
-                            os.path.exists(f"{paper_id}_pandoc_failed")
+                            os.path.exists(f"{paper_id}_pandoc_failure")
                             and not manual_conversion
                         ):
                             print(f"{paper_id} failed to convert with pandoc.")
@@ -575,7 +576,7 @@ class ArxivPapers:
                         self.arxiv_dict[number_id]["text"] = paper_text
                         json.dump(
                             self.arxiv_dict,
-                            open(f"{self.PROJECT_DIR}/arxiv_dict.json", "w"),
+                            open(f"{self.PROCESSED_JSONS_DIR}/arxiv_dict.json", "w"),
                         )
                         os.chdir(self.PROJECT_DIR)
                         sh(f"mv {paper_dir}/{paper_id}.md out/{paper_id}.md")
@@ -584,10 +585,11 @@ class ArxivPapers:
                         # can't find main file, so send to fallback_needed for manual conversion with convert_tex_semiauto
                         # it's useful to do it this way because then you can go through the fallback_needed folder and
                         # manually convert the files in a batch
-                        print(
-                            f"{paper_id} main filename not found in main_tex_dict, sending to fallback_needed"
-                        )
                         if self.automatic_mode_done == False:
+                            print(
+                                f"{paper_id} main filename not found in main_tex_dict, sending to fallback_needed"
+                            )
+                            sh("touch {paper_id}_unknown_main_tex_failure")
                             os.chdir(self.PROJECT_DIR)
                             sh(f"mv -f {paper_dir} fallback_needed/unknown_main_tex/")
                         else:
@@ -642,7 +644,8 @@ class ArxivPapers:
         while fixed_error == False:
             try:
                 os.chdir(self.PROJECT_DIR)
-                sh(f"rm -f {paper_id}_pandoc_failed")
+                sh(f"rm -f {paper_id}_pandoc_failure")
+                sh(f"rm -f {paper_id}_unknown_main_tex_failure")
                 main_doc = self.convert_tex(paper_dir, manual_conversion=True)
             except:
                 print(
