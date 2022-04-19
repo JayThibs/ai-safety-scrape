@@ -744,6 +744,7 @@ class ArxivPapers:
             )
             print(f"Saved CSV of all citations at level {self.citation_level}.")
 
+    @staticmethod
     def _fix_chars_in_dirs(self, parent):
         for path, folders, files in os.walk(parent):
             for f in files:
@@ -759,6 +760,7 @@ class ArxivPapers:
                         os.path.join(path, folder), os.path.join(path, new_folder_name)
                     )
 
+    @staticmethod
     def _preextract_tar(tar_filepath, output_dir="tmp"):
         """
         Creates tmp/{tar_name} directory and extracts tar files and copies them to tmp/tar_name/*.
@@ -854,13 +856,15 @@ class ArxivPapers:
             traceback.print_exc()
             print(f"Error deleting files in {paper_id}")
 
-    def _delete_style_files(self, paper_dir_path):
+    @staticmethod
+    def _delete_style_files(paper_dir_path):
         # delete all files with .sty extension
         for doc in lsr(paper_dir_path):
             if doc.endswith(".sty"):
                 sh(f"rm {doc}")
 
-    def _any_to_utf8(self, b):
+    @staticmethod
+    def _any_to_utf8(b):
         """Detects encoding and converts to utf-8."""
         try:
             return b.decode("utf-8")
@@ -891,7 +895,8 @@ class ArxivPapers:
                     print(f"Error converting {doc}, will go to /fallback_needed.")
                     print("Error converting files to utf-8.")
 
-    def _mv_files_to_root(self, rootdir="tmp"):
+    @staticmethod
+    def _mv_files_to_root(rootdir="tmp"):
         """Moves all files in root folder subdirectories to root folder."""
         for doc in ls(rootdir):
             try:
@@ -904,12 +909,14 @@ class ArxivPapers:
                     "Error moving files to root folder. Likely because there's a file with the same name in the root folder."
                 )
 
-    def _get_arxiv_ids(self, bib_file_path):
+    @staticmethod
+    def _get_arxiv_ids(bib_file_path):
         with open(bib_file_path, "r") as f:
             bib_string = f.read()
         return re.findall(r"(?:arXiv:|abs/)(\d{4}\.\d{4,5})", bib_string), bib_string
 
-    def _count_empty_mds(self, paper_dir):
+    @staticmethod
+    def _count_empty_mds(paper_dir):
         files = ls(paper_dir)
         empty_files = []
         for file in files:
@@ -1027,12 +1034,14 @@ class ArxivPapers:
         with open("ignore_dict.pkl", "wb") as f:
             pickle.dump(ignore_dict, f)
 
+    @staticmethod
     def _modify_caps(ignore_list_title):
         ignore_list_lower = []
         for item in ignore_list_title:
             ignore_list_lower.append(f"{item.lower()}.tex")
         return ignore_list_lower
 
+    @staticmethod
     def _csv_to_dict(csv_file):
         """
         Opens a csv file and returns a dictionary of the contents.
