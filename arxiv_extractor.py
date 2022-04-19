@@ -343,12 +343,10 @@ class ArxivPapers:
         for paper_folder in ls("errored/pandoc_failures/"):
             if os.path.isdir(paper_folder):
                 sh(f"mv {paper_folder} tmp")
-        failed_papers = ls("tmp")
-        for paper_folder in failed_papers:
+        for paper_folder in ls("fallback_needed/unknown_main_tex/"):
             if os.path.isdir(paper_folder):
-                for file in ls(paper_folder):
-                    if file.endswith("_failed"):
-                        sh(f"rm {file}")
+                sh(f"mv {paper_folder} tmp")
+        failed_papers = ls("tmp")
         for paper_folder in tqdm(failed_papers):
             try:
                 print(f'Converting errored papers: "{paper_folder}"')
@@ -556,7 +554,7 @@ class ArxivPapers:
                     if self.arxiv_dict[number_id]["main_tex_filename"] != "":
                         # if main file was stored in arxiv_dict, use it
                         # arxiv_dict is created when we need to use convert_tex_semiauto and manually inputting main tex filename
-                        main_tex = self.arxiv_dict[number_id]["main_tex_filename"]
+                        main_doc = self.arxiv_dict[number_id]["main_tex_filename"]
                         sh(
                             f"if ! timeout 7s pandoc -s {main_doc} -o {paper_id}.md --wrap=none; then touch {paper_id}_pandoc_failure; fi"
                         )
@@ -585,6 +583,7 @@ class ArxivPapers:
                         # can't find main file, so send to fallback_needed for manual conversion with convert_tex_semiauto
                         # it's useful to do it this way because then you can go through the fallback_needed folder and
                         # manually convert the files in a batch
+                        main_doc = ""
                         if self.automatic_mode_done == False:
                             print(
                                 f"{paper_id} main filename not found in main_tex_dict, sending to fallback_needed"
@@ -593,12 +592,12 @@ class ArxivPapers:
                             os.chdir(self.PROJECT_DIR)
                             sh(f"mv -f {paper_dir} fallback_needed/unknown_main_tex/")
                         else:
-                            print(
-                                "The main tex filename is unknown, please type and enter the filename manually. Here are the possible files:"
-                            )
+                            print("Here are the possible main tex filenames:")
                             print(matched_list)
-                            main_tex = input("Please enter the main tex filename: ")
-                            self.arxiv_dict[paper_id]["main_tex_filename"] = main_tex
+                            main_doc = input(
+                                "Please enter the correct main tex filename: "
+                            )
+                            self.arxiv_dict[paper_id]["main_tex_filename"] = main_doc
                             os.chdir(self.PROJECT_DIR)
                             json.dump(
                                 self.arxiv_dict,
@@ -606,7 +605,7 @@ class ArxivPapers:
                                     f"{self.PROCESSED_JSONS_DIR}/arxiv_dict.json", "w"
                                 ),
                             )
-                        return
+                        return main_doc
 
         except:
             try:
@@ -643,9 +642,22 @@ class ArxivPapers:
         paper_id = paper_dir.split("/")[-1]
         while fixed_error == False:
             try:
-                os.chdir(self.PROJECT_DIR)
-                sh(f"rm -f {paper_id}_pandoc_failure")
-                sh(f"rm -f {paper_id}_unknown_main_tex_failure")
+                os.chdir(paper_dir)
+                if os.path.exists(f"{paper_id}_pandoc_failure"):
+                    sh(f"rm -f {paper_id}_pandoc_failure")
+                    main_doc = self.arxiv_dict[paper_id]["main_tex_filename"]
+                    print(
+                        f"Opening {main_doc} in text editor. Please fix the error. Save the file once you are done. (On the first try, just press enter to run the conversion so that you can see the error.)"
+                    )
+                    sh(f"open {main_doc}")
+                    input("Press enter to try converting the paper.")
+                if os.path.exists(f"{paper_id}_unknown_main_tex_failure"):
+                    sh(f"rm -f {paper_id}_unknown_main_tex_failure")
+                    print(
+                        f"The main tex filename is unknown. Press enter to run the conversion and manually enter the filename."
+                    )
+                    # We run the conversion once to save the correct main tex filename, then run it again to convert the paper.
+                    main_doc = self.convert_tex(paper_dir, manual_conversion=True)
                 main_doc = self.convert_tex(paper_dir, manual_conversion=True)
             except:
                 print(
@@ -679,10 +691,6 @@ class ArxivPapers:
                 sh(f"mv {paper_dir}/{paper_id}.md out/{paper_id}.md")
                 break
             else:
-                print(
-                    f"Opening {main_doc} in text editor. Please fix the error. Save and close the file once you are done."
-                )
-                sh(f"open {main_doc}")
                 input(
                     "Press enter once you have fixed the error and fixed the tex file."
                 )
