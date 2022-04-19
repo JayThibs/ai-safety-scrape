@@ -37,7 +37,9 @@ class ArxivPapers:
         self.automatic_mode_done = False
         if self.automatic_mode == "y":
             self.automatic_extraction()
-            sh(f"rm -rf tmp && mkdir tmp")
+            sh(
+                f"rm -rf tmp && mkdir tmp"
+            )  # should be empty but just in case it has .DS_Store files
         self.automatic_mode_done = True
         if self.manual_mode == "y":
             self.manual_extraction()
@@ -709,7 +711,7 @@ class ArxivPapers:
             self.arxiv_dict[id]["text"] = text
         except ExitCodeError and KeyError:
             traceback.print_exc()
-            print(f"Error reading {mdfile}")
+            print(f"Error reading {mdfile}. May not exist.")
 
     def insert_main_tex_in_dict(self, main_tex_name_txt):
         try:
@@ -722,7 +724,7 @@ class ArxivPapers:
             ]
         except ExitCodeError and KeyError:
             traceback.print_exc()
-            print(f"Error reading {main_tex_name_txt}")
+            print(f"Error reading {main_tex_name_txt}. May not exist.")
 
     def _create_citations_csv(self):
         """
