@@ -63,19 +63,24 @@ class ArxivPapers:
         if self.remove_empty_papers == "y":
             self.arxiv_dict = self._remove_empty_mds_from_dict()
             self.arxiv_dict = self._remove_empty_texts_from_dict()
-        json.dump(self.arxiv_dict, open("arxiv_dict_updated.json", "w"))
-        print("Finished updating arxiv_dict_updated.json.")
+        json.dump(
+            self.arxiv_dict, open(f"{self.PROCESSED_JSONS_DIR}/arxiv_dict.json", "w")
+        )
+        print("Finished updating arxiv_dict.json.")
 
         self.arxiv_list_of_dicts = []
         for paper_id in tqdm(self.arxiv_dict.keys()):
             self.arxiv_list_of_dicts.append(self.arxiv_dict[paper_id])
-        json.dump(self.arxiv_list_of_dicts, open("arxiv_list_of_dicts.json", "w"))
+        json.dump(
+            self.arxiv_list_of_dicts,
+            open(f"{self.PROCESSED_JSONS_DIR}/arxiv_list_of_dicts.json", "w"),
+        )
 
         if os.path.exists("data/arxiv.jsonl"):
             os.remove("data/arxiv.jsonl")
             os.remove("data/arxiv.txt")
 
-        print("Converting arxiv_dict_updated.json to arxiv.jsonl and arxiv.txt...")
+        print("Converting arxiv_dict.json to arxiv.jsonl and arxiv.txt...")
         for i, paper in enumerate(self.arxiv_list_of_dicts):
             i = str(i)
             with jsonlines.open("data/arxiv.jsonl", "a") as writer:
@@ -86,7 +91,7 @@ class ArxivPapers:
         # delete_unwanted_files = input(
         #     "Delete unwanted files (only keep .jsonl and main .txt files)? (y/n) "
         # )
-        delete_unwanted_files = "n"
+        delete_unwanted_files = "y"
         if delete_unwanted_files == "y":
             sh(
                 "rm -rf tmp files done out outtxt errored fallback_needed data/interim data/raw"
@@ -106,8 +111,10 @@ class ArxivPapers:
         self.PROCESSED_TXTS_DIR = self.PROCESSED_DIR / "txts"
         self.PROCESSED_JSONS_DIR = self.PROCESSED_DIR / "jsons"
 
-        if os.path.exists("arxiv_dict_updated.json"):
-            self.arxiv_dict = json.load(open("arxiv_dict_updated.json"))
+        if os.path.exists(f"{self.PROCESSED_JSONS_DIR}/arxiv_dict.json"):
+            self.arxiv_dict = json.load(
+                open(f"{self.PROCESSED_JSONS_DIR}/arxiv_dict.json")
+            )
         else:
             self.arxiv_dict = {}
 
@@ -115,11 +122,16 @@ class ArxivPapers:
         # {root_paper_id_1: [citation_paper_id_1, citation_paper_id_2, ...], ...}
         # root_paper_id_2: [citation_paper_id_1, citation_paper_id_2, ...], ...}
         # The dictionary is updated in the prepare_extracted_tars function.
-        if os.path.exists("arxiv_citations_dict.json"):
-            self.arxiv_citations_dict = json.load(open("arxiv_citations_dict.json"))
+        if os.path.exists(f"{self.PROCESSED_JSONS_DIR}/arxiv_citations_dict.json"):
+            self.arxiv_citations_dict = json.load(
+                open(f"{self.PROCESSED_JSONS_DIR}/arxiv_citations_dict.json")
+            )
         else:
             self.arxiv_citations_dict = {}
-            json.dump(self.arxiv_citations_dict, open("arxiv_citations_dict.json", "w"))
+            json.dump(
+                self.arxiv_citations_dict,
+                open(f"{self.PROCESSED_JSONS_DIR}/arxiv_citations_dict.json", "w"),
+            )
 
         if not os.path.exists("ignore_dict.pkl"):
             self._filenames_to_ignore()
@@ -302,7 +314,7 @@ class ArxivPapers:
             print("Paper download failures:")
             print(paper_dl_failures)
 
-        with open("arxiv_dict.json", "w") as fp:
+        with open(f"{self.PROCESSED_JSONS_DIR}/arxiv_dict.json", "w") as fp:
             json.dump(self.arxiv_dict, fp)
 
         with open(self.PKLS_DIR / "arxiv_paper_tars_list.pkl", "wb") as f:
@@ -411,7 +423,10 @@ class ArxivPapers:
                 os.chdir(self.PROJECT_DIR)
                 self.arxiv_dict[number_id]["source_filetype"] = "pdf"
                 self.arxiv_dict[number_id]["converted_with"] = ""
-                json.dump(self.arxiv_dict, open("arxiv_dict.json", "w"))
+                json.dump(
+                    self.arxiv_dict,
+                    open(f"{self.PROCESSED_JSONS_DIR}/arxiv_dict.json", "w"),
+                )
                 sh(f"mv -f {paper_dir} fallback_needed/pdf_only")
                 return
             for doc in paper_dir_root:
@@ -591,7 +606,7 @@ class ArxivPapers:
                         main_doc = ""
                         if self.automatic_mode_done == False:
                             print(
-                                f"{paper_id} main filename not found in main_tex_dict, sending to fallback_needed"
+                                f"{paper_id} main filename not found in main_tex_filename, sending to fallback_needed"
                             )
                             sh("touch {paper_id}_unknown_main_tex_failure")
                             os.chdir(self.PROJECT_DIR)
@@ -702,18 +717,17 @@ class ArxivPapers:
                 continue
 
     def insert_text_in_dict(self, mdfile):
+        mdfile = mdfile.split("/")[-1]
+        id = mdfile.split("v")[0]
         try:
-            mdfile = mdfile.split("/")[-1]
-            id = mdfile.split("v")[0]
-            if os.path.exists(mdfile):
-                self.arxiv_dict[id]["good_extraction"] = True
-            else:
-                self.arxiv_dict[id]["good_extraction"] = False
             with open(f"out/{mdfile}", "r") as f:
                 text = f.read()
             self.arxiv_dict[id]["text"] = text
+            self.arxiv_dict[id]["good_extraction"] = True
         except ExitCodeError and KeyError:
             traceback.print_exc()
+            if id in self.arxiv_dict:
+                self.arxiv_dict[id]["good_extraction"] = False
             print(f"Error reading {mdfile}. May not exist.")
 
     def insert_main_tex_in_dict(self, main_tex_name_txt):
@@ -782,7 +796,9 @@ class ArxivPapers:
         paper_id = paper_dir_path.split("/")[-1]
         try:
             # load arxiv_citations_dict json to add citations to paper_id
-            self.arxiv_citations_dict = json.load(open("arxiv_citations_dict.json"))
+            self.arxiv_citations_dict = json.load(
+                open(f"{self.PROCESSED_JSONS_DIR}/arxiv_citations_dict.json")
+            )
             try:
                 for doc in lsr(paper_dir_path):
                     if doc.endswith(".gz"):
@@ -823,7 +839,10 @@ class ArxivPapers:
                                     )
                             json.dump(
                                 self.arxiv_citations_dict,
-                                open("arxiv_citations_dict.json", "w"),
+                                open(
+                                    f"{self.PROCESSED_JSONS_DIR}/arxiv_citations_dict.json",
+                                    "w",
+                                ),
                             )
                             id = paper_id.split("v")[0]  # remove version number
                             self.arxiv_dict[id][
@@ -833,7 +852,10 @@ class ArxivPapers:
                             self.arxiv_dict[id]["bibliography_bbl"] = bibliography
                         elif doc.endswith(".bib"):
                             self.arxiv_dict[id]["bibliography_bib"] = bibliography
-                        json.dump(self.arxiv_dict, open("arxiv_dict.json", "w"))
+                        json.dump(
+                            self.arxiv_dict,
+                            open(f"{self.PROCESSED_JSONS_DIR}/arxiv_dict.json", "w"),
+                        )
 
                     # check if filename has no extension, this is likely a .tex file
                     # if so, add .tex to the filename
@@ -957,7 +979,8 @@ class ArxivPapers:
     def _remove_empty_texts_from_dict(self):
         total_papers = len(self.arxiv_dict)
         removed_papers = 0
-        for paper_id in self.arxiv_dict.keys().copy():
+        paper_ids = list(self.arxiv_dict.keys())
+        for paper_id in paper_ids:
             if (
                 len(self.arxiv_dict[paper_id]["text"]) < 500
                 and self.arxiv_dict[paper_id]["main_tex_filename"] != ""
