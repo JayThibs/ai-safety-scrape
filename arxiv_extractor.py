@@ -13,6 +13,7 @@ from tqdm import tqdm
 import traceback
 from pathlib import Path
 import multiprocessing as mp
+import argparse
 from utils import *
 import arxiv
 
@@ -25,11 +26,12 @@ class ArxivPapers:
         """
         Fetch all the arxiv entries from the arxiv API.
         """
+        ## TODO: Add argparse to make this easier to use and rerun
         print("Setting up directory structure...")
         self.setup()
-        print("Downloading all source files for arxiv entries...")
         dl_papers_answer = input("Download papers? (y/n): ")
         if dl_papers_answer == "y":
+            print("Downloading all source files for arxiv entries...")
             self.arxiv_dict = self.download_arxiv_paper_tars()
         if ls("files") == []:
             sh(f"mv {self.TARS_DIR}/* files/")
@@ -59,8 +61,8 @@ class ArxivPapers:
             self.insert_main_tex_in_dict(main_tex_name_txt)
 
         if self.remove_empty_papers == "y":
-            self.arxiv_dict = self._remove_empty_mds_from_dict(self.arxiv_dict)
-            self.arxiv_dict = self._remove_empty_texts_from_dict(self.arxiv_dict)
+            self.arxiv_dict = self._remove_empty_mds_from_dict()
+            self.arxiv_dict = self._remove_empty_texts_from_dict()
         json.dump(self.arxiv_dict, open("arxiv_dict_updated.json", "w"))
         print("Finished updating arxiv_dict_updated.json.")
 
@@ -89,6 +91,7 @@ class ArxivPapers:
             sh(
                 "rm -rf tmp files done out outtxt errored fallback_needed data/interim data/raw"
             )
+        print("Done extracting text and metadata from arxiv entries.")
 
     def setup(self):
 
@@ -324,17 +327,17 @@ class ArxivPapers:
             print(f"{i}/{len(paper_folders)}")
             os.chdir(self.PROJECT_DIR)
             done_paper_folder = "done/" + paper_folder.split("/")[-1]
-            if os.path.exists(done_paper_folder):
-                sh(f"rm -rf {paper_folder}")
-                continue
             try:
+                if os.path.exists(done_paper_folder):
+                    sh(f"rm -rf {paper_folder}")
+                    continue
                 print(f"preparing {paper_folder}")
                 self._fix_chars_in_dirs(paper_folder)
                 self._prepare_extracted_tars(paper_folder)
                 self._delete_style_files(
                     paper_folder
                 )  # putting this here too to make sure they are deleted
-                self.convert_tex(paper_dir=paper_folder, arxiv_dict=self.arxiv_dict)
+                self.convert_tex(paper_dir=paper_folder)
                 if os.path.exists(paper_folder):
                     sh(f"mv {paper_folder} done")
             except ExitCodeError:
@@ -699,13 +702,13 @@ class ArxivPapers:
                 continue
 
     def insert_text_in_dict(self, mdfile):
-        if os.path.exists(mdfile):
-            self.arxiv_dict[id]["good_extraction"] = True
-        else:
-            self.arxiv_dict[id]["good_extraction"] = False
         try:
             mdfile = mdfile.split("/")[-1]
             id = mdfile.split("v")[0]
+            if os.path.exists(mdfile):
+                self.arxiv_dict[id]["good_extraction"] = True
+            else:
+                self.arxiv_dict[id]["good_extraction"] = False
             with open(f"out/{mdfile}", "r") as f:
                 text = f.read()
             self.arxiv_dict[id]["text"] = text
@@ -745,7 +748,7 @@ class ArxivPapers:
             print(f"Saved CSV of all citations at level {self.citation_level}.")
 
     @staticmethod
-    def _fix_chars_in_dirs(self, parent):
+    def _fix_chars_in_dirs(parent):
         for path, folders, files in os.walk(parent):
             for f in files:
                 os.rename(
@@ -954,10 +957,13 @@ class ArxivPapers:
     def _remove_empty_texts_from_dict(self):
         total_papers = len(self.arxiv_dict)
         removed_papers = 0
-        for paper in self.arxiv_dict:
-            if len(paper["text"]) < 500 and paper["main_tex_filename"] != "":
+        for paper_id in self.arxiv_dict.keys().copy():
+            if (
+                len(self.arxiv_dict[paper_id]["text"]) < 500
+                and self.arxiv_dict[paper_id]["main_tex_filename"] != ""
+            ):
                 removed_papers += 1
-                self.arxiv_dict.pop(paper["id"], None)
+                self.arxiv_dict.pop(paper_id, None)
         print(f"{removed_papers} out of {total_papers} papers removed")
         return self.arxiv_dict
 
