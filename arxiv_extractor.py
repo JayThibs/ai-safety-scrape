@@ -106,10 +106,12 @@ class ArxivPapers:
         self.PROCESSED_DIR = Path("data/processed")
         self.TARS_DIR = self.RAW_DIR / "tars"
         self.LATEX_DIR = self.RAW_DIR / "latex_files"
+        self.RAW_CSVS = self.RAW_DIR / "csvs"
         self.PKLS_DIR = self.INTERIM_DIR / "pkls"
         self.PDFS_DIR = self.PROCESSED_DIR / "pdfs"
         self.PROCESSED_TXTS_DIR = self.PROCESSED_DIR / "txts"
         self.PROCESSED_JSONS_DIR = self.PROCESSED_DIR / "jsons"
+        self.PROCESSED_CSVS_DIR = self.PROCESSED_DIR / "csvs"
 
         if os.path.exists(f"{self.PROCESSED_JSONS_DIR}/arxiv_dict.json"):
             self.arxiv_dict = json.load(
@@ -171,10 +173,10 @@ class ArxivPapers:
             "mkdir -p fallback_needed/unknown_main_tex fallback_needed/pdf_only errored/pandoc_failures errored/unknown_errors"
         )
         sh(
-            f"mkdir -p {self.RAW_DIR} {self.INTERIM_DIR} {self.PROCESSED_DIR} {self.TARS_DIR} {self.LATEX_DIR} {self.PDFS_DIR}"
+            f"mkdir -p {self.RAW_DIR} {self.INTERIM_DIR} {self.PROCESSED_DIR} {self.TARS_DIR} {self.RAW_CSVS} {self.LATEX_DIR} {self.PDFS_DIR}"
         )
         sh(
-            f"mkdir -p {self.PKLS_DIR} {self.PROCESSED_TXTS_DIR} {self.PROCESSED_JSONS_DIR}"
+            f"mkdir -p {self.PKLS_DIR} {self.PROCESSED_TXTS_DIR} {self.PROCESSED_JSONS_DIR} {self.PROCESSED_CSVS_DIR}"
         )
         # Automatic Mode will go through all the papers in files and try
         # to convert them to markdown.
@@ -226,7 +228,8 @@ class ArxivPapers:
             print(f"{len(papers)} papers to download")
         else:
             df = pd.read_csv(
-                f"all_citations_level_{self.citation_level}.csv", index_col=0
+                f"{self.PROCESSED_CSVS_DIR}/all_citations_level_{self.citation_level}.csv",
+                index_col=0,
             )
             papers = list(set(list(df.index)))
             print(f"{len(papers)} papers to download")
@@ -747,19 +750,20 @@ class ArxivPapers:
         """
         Create a csv file with all the arxiv citations for each paper.
         """
-        if self.citation_level != "0":
-            print(
-                f"Citation level is {self.citation_level}, so we'll create a CSV of the papers at that citation level."
-            )
-            all_citations = {}
-            for paper_id in self.arxiv_citations_dict.keys():
-                for citation in self.arxiv_citations_dict[paper_id].keys():
-                    all_citations[citation] = True
-            all_citations = pd.DataFrame(list(all_citations.keys()))
-            all_citations.to_csv(
-                f"all_citations_level_{self.citation_level}.csv", index=False
-            )
-            print(f"Saved CSV of all citations at level {self.citation_level}.")
+        new_citation_level = str(int(self.citation_level) + 1)
+        print(
+            f"Citation level is {self.citation_level}, so we'll create a CSV of the papers at the next citation level ({new_citation_level})."
+        )
+        all_citations = {}
+        for paper_id in self.arxiv_citations_dict.keys():
+            for citation in self.arxiv_citations_dict[paper_id].keys():
+                all_citations[citation] = True
+        all_citations = pd.DataFrame(list(all_citations.keys()))
+        all_citations.to_csv(
+            f"{self.PROCESSED_CSVS_DIR}/all_citations_level_{new_citation_level}.csv",
+            index=False,
+        )
+        print(f"Saved CSV of all citations at level {new_citation_level}.")
 
     @staticmethod
     def _fix_chars_in_dirs(parent):
@@ -1053,14 +1057,16 @@ class ArxivPapers:
 
         ignore_list = self._modify_caps(ignore_list_title)
         df_ignore = pd.DataFrame(ignore_list)
-        df_ignore.to_csv("ignore_filenames.csv", index=False, header=False)
-        ignore_dict = self._csv_to_dict("ignore_filenames.csv")
+        df_ignore.to_csv(
+            f"{self.RAW_CSVS}/ignore_filenames.csv", index=False, header=False
+        )
+        ignore_dict = self._csv_to_dict(f"{self.RAW_CSVS}/ignore_filenames.csv")
         if "Approached" in ignore_dict:
             print("Approach is in ignore_dict")
         else:
             print("Approach is not in ignore_dict")
 
-        with open("ignore_dict.pkl", "wb") as f:
+        with open(f"{self.PKLS_DIR}/ignore_dict.pkl", "wb") as f:
             pickle.dump(ignore_dict, f)
 
     @staticmethod
