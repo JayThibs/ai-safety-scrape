@@ -32,7 +32,7 @@ class ArxivPapers:
         dl_papers_answer = input("Download papers? (y/n): ")
         if dl_papers_answer == "y":
             print("Downloading all source files for arxiv entries...")
-            self.arxiv_dict = self.download_arxiv_paper_tars()
+            self.arxiv_dict = self.download_arxiv_papers()
         if ls("files") == []:
             sh(f"mv {self.TARS_DIR}/* files/")
         print("Extracting text and citations from arxiv entries...")
@@ -86,16 +86,18 @@ class ArxivPapers:
             with jsonlines.open("data/arxiv.jsonl", "a") as writer:
                 writer.write(paper)
             with open("data/arxiv.txt", "a") as f:
-                f.write(f"[ENTRY {i}] \n\n {paper['text']} \n\n")
+                # Save the entry in plain text, mainly for debugging
+                text = (
+                    "    ".join(("\n" + paper["text"].lstrip()).splitlines(True)) + "\n"
+                )
+                f.write(f"[ENTRY {i}] {text}")
 
         # delete_unwanted_files = input(
         #     "Delete unwanted files (only keep .jsonl and main .txt files)? (y/n) "
         # )
         delete_unwanted_files = "y"
         if delete_unwanted_files == "y":
-            sh(
-                "rm -rf tmp files done out outtxt errored fallback_needed data/interim data/raw"
-            )
+            sh("rm -rf tmp files done out outtxt")
         print("Done extracting text and metadata from arxiv entries.")
 
     def setup(self):
@@ -106,7 +108,8 @@ class ArxivPapers:
         self.PROCESSED_DIR = Path("data/processed")
         self.TARS_DIR = self.RAW_DIR / "tars"
         self.LATEX_DIR = self.RAW_DIR / "latex_files"
-        self.RAW_CSVS = self.RAW_DIR / "csvs"
+        self.RAW_CSVS_DIR = self.RAW_DIR / "csvs"
+        self.ARXIV_PDFS_DIR = self.RAW_DIR / "pdfs/arxiv"
         self.PKLS_DIR = self.INTERIM_DIR / "pkls"
         self.PDFS_DIR = self.PROCESSED_DIR / "pdfs"
         self.PROCESSED_TXTS_DIR = self.PROCESSED_DIR / "txts"
@@ -173,7 +176,7 @@ class ArxivPapers:
             "mkdir -p fallback_needed/unknown_main_tex fallback_needed/pdf_only errored/pandoc_failures errored/unknown_errors"
         )
         sh(
-            f"mkdir -p {self.RAW_DIR} {self.INTERIM_DIR} {self.PROCESSED_DIR} {self.TARS_DIR} {self.RAW_CSVS} {self.LATEX_DIR} {self.PDFS_DIR}"
+            f"mkdir -p {self.RAW_DIR} {self.INTERIM_DIR} {self.PROCESSED_DIR} {self.TARS_DIR} {self.RAW_CSVS_DIR} {self.LATEX_DIR} {self.PDFS_DIR}"
         )
         sh(
             f"mkdir -p {self.PKLS_DIR} {self.PROCESSED_TXTS_DIR} {self.PROCESSED_JSONS_DIR} {self.PROCESSED_CSVS_DIR}"
@@ -211,14 +214,16 @@ class ArxivPapers:
 
         self.main_tex_name_list = [f"{item}.tex" for item in main_tex_name_list]
 
-    def download_arxiv_paper_tars(
+    def download_arxiv_papers(
         self,
+        pdf=False,
         create_dict_only=False,
     ):
         """
-        Download arxiv paper tars.
+        Download arxiv papers (pdf or latex source).
         Args:
             citation_level: 0 = original, 1 = citation of original, 2 = citation of citation, etc.
+            pdf: True: download pdfs instead of latex source files, False: download latex source files
             create_dict_only: True or False
         """
         if self.citation_level == "0":
@@ -303,8 +308,13 @@ class ArxivPapers:
                 pass
 
             try:
-                paper.download_source(dirpath=str(self.TARS_DIR), filename=tar_filename)
-                print("; Downloaded paper: " + paper_id)
+                if pdf:
+                    paper.download_pdf(dirpath=str(self.ARXIV_PDFS_DIR))
+                else:
+                    paper.download_source(
+                        dirpath=str(self.TARS_DIR), filename=tar_filename
+                    )
+                    print("; Downloaded paper: " + paper_id)
             except:
                 print("; Could not download paper: " + paper_id)
                 paper_dl_failures.append(paper_id)
@@ -1058,9 +1068,9 @@ class ArxivPapers:
         ignore_list = self._modify_caps(ignore_list_title)
         df_ignore = pd.DataFrame(ignore_list)
         df_ignore.to_csv(
-            f"{self.RAW_CSVS}/ignore_filenames.csv", index=False, header=False
+            f"{self.RAW_CSVS_DIR}/ignore_filenames.csv", index=False, header=False
         )
-        ignore_dict = self._csv_to_dict(f"{self.RAW_CSVS}/ignore_filenames.csv")
+        ignore_dict = self._csv_to_dict(f"{self.RAW_CSVS_DIR}/ignore_filenames.csv")
         if "Approached" in ignore_dict:
             print("Approach is in ignore_dict")
         else:
