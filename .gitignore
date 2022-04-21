@@ -9,7 +9,6 @@ files/
 out/
 outtxt/
 data/
-*.json
 *.pkl
 *.tex
 
