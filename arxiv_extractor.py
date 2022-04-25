@@ -76,16 +76,16 @@ class ArxivPapers:
             open(f"{self.PROCESSED_JSONS_DIR}/arxiv_list_of_dicts.json", "w"),
         )
 
-        if os.path.exists("data/arxiv.jsonl"):
-            os.remove("data/arxiv.jsonl")
-            os.remove("data/arxiv.txt")
+        if os.path.exists("data/arxiv_pandoc.jsonl"):
+            os.remove("data/arxiv_pandoc.jsonl")
+            os.remove("data/arxiv_pandoc.txt")
 
         print("Converting arxiv_dict.json to arxiv.jsonl and arxiv.txt...")
         for i, paper in enumerate(self.arxiv_list_of_dicts):
             i = str(i)
-            with jsonlines.open("data/arxiv.jsonl", "a") as writer:
+            with jsonlines.open("data/arxiv_pandoc.jsonl", "a") as writer:
                 writer.write(paper)
-            with open("data/arxiv.txt", "a") as f:
+            with open("data/arxiv_pandoc.txt", "a") as f:
                 # Save the entry in plain text, mainly for debugging
                 text = (
                     "    ".join(("\n" + paper["text"].lstrip()).splitlines(True)) + "\n"
