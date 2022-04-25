@@ -1,10 +1,11 @@
-from paper2json.tei2json import convert_tei_xml_file_to_s2orc_json
-import json
-from dspipe import Pipe
 import os
+import json
+import jsonlines
+from dspipe import Pipe
+import multiprocessing as mp
 from utils import *
 from arxiv_extractor import ArxivPapers
-import multiprocessing as mp
+from paper2json.tei2json import convert_tei_xml_file_to_s2orc_json
 
 
 def tei2json(input_file_path, output_file_path):
@@ -63,32 +64,63 @@ def convert_folder_to_json(input_folder_path, output_folder_path, pipe=True):
 
 
 if __name__ == "__main__":
-    sh(
-        "mkdir -p data/raw/pdfs/non_arxiv_papers data/raw/pdfs/reports data/raw/pdfs/arxiv data/tei_arxiv"
-    )
-    sh(
-        "mkdir -p data/processed/jsons/non_arxiv_paper_jsons data/processed/jsons/report_jsons data/processed/jsons/arxiv_paper_jsons"
-    )
-    sh(
-        "mkdir -p data/interim/tei/non_arxiv_papers data/interim/tei/reports data/interim/tei/arxiv_papers"
-    )
+    names = ["arxiv_papers", "non_arxiv_papers", "reports"]
+    json_folder_paths = []
+    tei_files = []
+    sh("mkdir -p data/processed/main_jsons")
+    for filename in names:
+        sh(f"mkdir -p data/pdfs/{filename}")
+        sh(f"mkdir -p data/processed/{filename}_jsons")
+        sh(f"mkdir -p data/interim/tei/{filename}")
+        json_folder_paths.append(f"data/processed/jsons/{filename}_jsons")
+        if os.path.exists(f"data/processed/jsonl/{filename}.jsonl"):
+            os.remove(f"data/processed/jsonl/{filename}.jsonl")
+        tei_files.append(ls(f"data/interim/tei/{filename}"))
+
     arxivPapers = ArxivPapers()
     if os.listdir("data/raw/pdfs/arxiv_papers") == []:
         arxivPapers.setup()
         arxivPapers.download_arxiv_papers(pdf=True)
+
     n_threads = mp.cpu_count()
-    if os.listdir("data/raw/pdfs/arxiv_papers") == []:
+    for i, filename in enumerate(names):
         sh(
-            f"grobid_client --input 'data/raw/pdfs/arxiv_papers' --output 'data/interim/tei/arxiv_papers' --n {n_threads}  processFulltextDocument"
+            f"grobid_client --input 'data/raw/pdfs/{filename}' --output 'data/interim/tei/{filename}' --n {n_threads}  processFulltextDocument"
         )
-    convert_folder_to_json(
-        "data/interim/tei/non_arxiv_papers",
-        "data/processed/jsons/non_arxiv_paper_jsons",
-        True,
-    )
-    convert_folder_to_json(
-        "data/interim/tei/reports", "data/processed/jsons/report_jsons", True
-    )
-    convert_folder_to_json(
-        "data/interim/tei/arxiv_papers", "data/processed/jsons/arxiv_paper_jsons", True
-    )
+        convert_folder_to_json(
+            f"data/interim/tei/{filename}", json_folder_paths[i], True
+        )
+
+    # Create main json and jsonl files
+    json_files = [
+        ls(json_folder_paths[0]),
+        ls(json_folder_paths[1]),
+        ls(json_folder_paths[2]),
+    ]
+    json_list = []
+
+    for name, text_jsons in zip(names, json_files):
+        for i, filename in enumerate(text_jsons):
+            i = str(i)
+            paper = json.load(open(filename))
+            with jsonlines.open(f"data/{name}.jsonl", "a") as writer:
+                writer.write(paper)
+            with open("data/arxiv.txt", "a") as f:
+                # Save the entry in plain text, mainly for debugging
+                text = (
+                    "    ".join(("\n" + paper["text"].lstrip()).splitlines(True)) + "\n"
+                )
+                f.write(f"[ENTRY {i}] {text}")
+            json_list.append(paper)
+            print(i + "/" + str(len(text_jsons)))
+        json.dump(json_list, open(f"data/processed/main_jsons/{name}.json", "w"))
+
+    # Deleting tei files which have already been converted to json
+    for i, tei_file in enumerate(tei_files):
+        tei_files[i] = tei_file[:-8]  # remove extension
+    for i, json_file in enumerate(json_files):
+        json_files[i] = json_file[:-5].split("/")[-1]  # remove extension
+    for json_file in json_files:
+        potential_tei_file = "data/interim/tei/arxiv_papers/" + json_file + ".tei.xml"
+        if os.path.exists(potential_tei_file):
+            os.remove(potential_tei_file)
