@@ -73,8 +73,8 @@ if __name__ == "__main__":
         sh(f"mkdir -p data/processed/{filename}_jsons")
         sh(f"mkdir -p data/interim/tei/{filename}")
         json_folder_paths.append(f"data/processed/jsons/{filename}_jsons")
-        if os.path.exists(f"data/processed/jsonl/{filename}.jsonl"):
-            os.remove(f"data/processed/jsonl/{filename}.jsonl")
+        if os.path.exists(f"data/{filename}_grobid.jsonl"):
+            os.remove(f"data/{filename}_grobid.jsonl")
         tei_files.append(ls(f"data/interim/tei/{filename}"))
 
     arxivPapers = ArxivPapers()
@@ -103,9 +103,9 @@ if __name__ == "__main__":
         for i, filename in enumerate(text_jsons):
             i = str(i)
             paper = json.load(open(filename))
-            with jsonlines.open(f"data/{name}.jsonl", "a") as writer:
+            with jsonlines.open(f"data/{name}_grobid.jsonl", "a") as writer:
                 writer.write(paper)
-            with open("data/arxiv.txt", "a") as f:
+            with open("data/arxiv_grobid.txt", "a") as f:
                 # Save the entry in plain text, mainly for debugging
                 text = (
                     "    ".join(("\n" + paper["text"].lstrip()).splitlines(True)) + "\n"
@@ -113,7 +113,7 @@ if __name__ == "__main__":
                 f.write(f"[ENTRY {i}] {text}")
             json_list.append(paper)
             print(i + "/" + str(len(text_jsons)))
-        json.dump(json_list, open(f"data/processed/main_jsons/{name}.json", "w"))
+        json.dump(json_list, open(f"data/processed/main_jsons/{name}_grobid.json", "w"))
 
     # Deleting tei files which have already been converted to json
     for i, tei_file in enumerate(tei_files):
