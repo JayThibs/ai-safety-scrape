@@ -69,7 +69,7 @@ if __name__ == "__main__":
     tei_files = []
     sh("mkdir -p data/processed/main_jsons")
     for filename in names:
-        sh(f"mkdir -p data/pdfs/{filename}")
+        sh(f"mkdir -p data/raw/pdfs/{filename}")
         sh(f"mkdir -p data/processed/{filename}_jsons")
         sh(f"mkdir -p data/interim/tei/{filename}")
         json_folder_paths.append(f"data/processed/jsons/{filename}_jsons")
@@ -79,14 +79,17 @@ if __name__ == "__main__":
 
     arxivPapers = ArxivPapers()
     if os.listdir("data/raw/pdfs/arxiv_papers") == []:
+        print("Setting up environment for downloading arxiv papers...")
         arxivPapers.setup()
         arxivPapers.download_arxiv_papers(pdf=True)
 
     n_threads = mp.cpu_count()
     for i, filename in enumerate(names):
+        print(f"Converting {filename} to .tei with grobid...")
         sh(
             f"grobid_client --input 'data/raw/pdfs/{filename}' --output 'data/interim/tei/{filename}' --n {n_threads}  processFulltextDocument"
         )
+        print(f"Converting {filename} to json...")
         convert_folder_to_json(
             f"data/interim/tei/{filename}", json_folder_paths[i], True
         )
@@ -98,7 +101,7 @@ if __name__ == "__main__":
         ls(json_folder_paths[2]),
     ]
     json_list = []
-
+    print("Creating jsonl file...")
     for name, text_jsons in zip(names, json_files):
         for i, filename in enumerate(text_jsons):
             i = str(i)
@@ -115,12 +118,16 @@ if __name__ == "__main__":
             print(i + "/" + str(len(text_jsons)))
         json.dump(json_list, open(f"data/processed/main_jsons/{name}_grobid.json", "w"))
 
+    print("Deleting intermediate files...")
     # Deleting tei files which have already been converted to json
     for i, tei_file in enumerate(tei_files):
         tei_files[i] = tei_file[:-8]  # remove extension
+    # flatten json_list
+    json_files = [item for sublist in json_files for item in sublist]
     for i, json_file in enumerate(json_files):
         json_files[i] = json_file[:-5].split("/")[-1]  # remove extension
     for json_file in json_files:
         potential_tei_file = "data/interim/tei/arxiv_papers/" + json_file + ".tei.xml"
         if os.path.exists(potential_tei_file):
             os.remove(potential_tei_file)
+    print("Done!")
