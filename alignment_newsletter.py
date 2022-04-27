@@ -23,13 +23,35 @@ class AlignmentNewsletter:
         self.setup()
 
     def fetch_entries(self):
+        print("Fetching alignment_newsletter entries")
         self.alignment_newsletter = {}
         # self.df = self.df.iloc[0:10]
         # with concurrent.futures.ProcessPoolExecutor(self.n_threads) as executor:
         #     executor.map(self.fetch_individual_entries, self.df.to_dict("records"))
         for index, row in self.df.iterrows():
             self.fetch_individual_entries(index, row)
-        return self.alignment_newsletter
+
+        print("Removing entries with no summaries...")
+        alignment_newsletter_entries = {
+            k: v
+            for k, v in self.alignment_newsletter.items()
+            if v["paper_summary"] != "nan"
+        }
+        alignment_newsletter_entry_list = []
+        for entry in alignment_newsletter_entries.keys():
+            alignment_newsletter_entry_list.append(alignment_newsletter_entries[entry])
+
+        print("Creating jsonl and txt file...")
+        for i, entry in enumerate(alignment_newsletter_entry_list):
+            i = str(i)
+            with jsonlines.open("data/alignment_newsletter.jsonl", "a") as writer:
+                writer.write(entry)
+            with open("data/alignment_newsletter.txt", "a") as f:
+                # Save the entry in plain text, mainly for debugging
+                text = (
+                    "    ".join(("\n" + entry["text"].lstrip()).splitlines(True)) + "\n"
+                )
+                f.write(f"[ENTRY {i}] {text}")
 
     def fetch_individual_entries(self, index, row):
         print(f"Processing entry {index}/{len(self.df)}")
@@ -55,6 +77,7 @@ class AlignmentNewsletter:
 
         abs = ""
         markdown_text = ""
+        newsletter_text = ""
         if row["Venue"] == "arXiv":
             try:
                 paper = arxiv.Search(id_list=[arxiv_id], max_results=1)
@@ -70,6 +93,17 @@ class AlignmentNewsletter:
                 markdown_text = extract_body_as_markdown_from_tei(soup.body)
             except:
                 pass
+        # Extracting the markdown text from the newsletter
+        try:
+            r = requests.get(newsletter_url)
+            soup = bs(r.text)
+            newsletter_text = extract_body_as_markdown_from_tei(soup.body)
+            newsletter_text = (
+                "Highlights\n\n"
+                + newsletter_text.split("Highlights\n")[1].split(" |\n")[0]
+            )
+        except:
+            pass
         summary = (
             "Title: "
             + str(row["Title"])
@@ -110,14 +144,20 @@ class AlignmentNewsletter:
             "doi": str(paper.doi) if abs != "" else "",
             "primary_category": str(paper.primary_category) if abs != "" else "",
             "categories": str(paper.categories) if abs != "" else "",
-            "text": str(summary),
+            "individual_summary": str(summary),
             "paper_text": str(markdown_text),
+            "full_newsletter_text": newsletter_text,
             "bibliography_bbl": "",
             "bibliography_bib": "",
         }
 
     def setup(self):
         sh("mkdir -p data/processed/alignment_newsletter")
+        if os.path.exists("data/alignment_newsletter.jsonl"):
+            print("Deleting old alignment_newsletter.jsonl")
+            os.remove("data/alignment_newsletter.jsonl")
+        if os.path.exists("data/aligned_newsletter.txt"):
+            os.remove("data/alignment_newsletter.txt")
         # put the alignment_newsletter.xlsx file in the raw/alignment_newsletter folder
         # download new excel file here: https://docs.google.com/spreadsheets/d/1PwWbWZ6FPqAgZWOoOcXM8N_tUCuxpEyMbN1NYYC02aM/edit#gid=0
         self.df = pd.read_excel(
@@ -132,33 +172,4 @@ class AlignmentNewsletter:
 
 if __name__ == "__main__":
 
-    if os.path.exists("data/alignment_newsletter.jsonl"):
-        print("Deleting old alignment_newsletter.jsonl")
-        os.remove("data/alignment_newsletter.jsonl")
-    if os.path.exists("data/aligned_newsletter.txt"):
-        os.remove("data/alignment_newsletter.txt")
-
-    print("Fetching alignment_newsletter entries")
-    alignment_newsletter_entries = AlignmentNewsletter(
-        n_threads=mp.cpu_count()
-    ).fetch_entries()
-
-    print("Removing entries with no summaries...")
-    alignment_newsletter_entries = {
-        k: v
-        for k, v in alignment_newsletter_entries.items()
-        if v["paper_summary"] != "nan"
-    }
-    alignment_newsletter_entry_list = []
-    for entry in alignment_newsletter_entries.keys():
-        alignment_newsletter_entry_list.append(alignment_newsletter_entries[entry])
-
-    print("Creating jsonl and txt file...")
-    for i, entry in enumerate(alignment_newsletter_entry_list):
-        i = str(i)
-        with jsonlines.open("data/alignment_newsletter.jsonl", "a") as writer:
-            writer.write(entry)
-        with open("data/alignment_newsletter.txt", "a") as f:
-            # Save the entry in plain text, mainly for debugging
-            text = "    ".join(("\n" + entry["text"].lstrip()).splitlines(True)) + "\n"
-            f.write(f"[ENTRY {i}] {text}")
+    AlignmentNewsletter(n_threads=mp.cpu_count()).fetch_entries()
