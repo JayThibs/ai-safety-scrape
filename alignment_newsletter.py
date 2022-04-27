@@ -44,6 +44,32 @@ class AlignmentNewsletter:
         print("Creating jsonl and txt file...")
         for i, entry in enumerate(alignment_newsletter_entry_list):
             i = str(i)
+            with jsonlines.open(
+                "data/alignment_newsletter_separate_summaries.jsonl", "a"
+            ) as writer:
+                writer.write(entry)
+            with open("data/alignment_newsletter_separate_summaries.txt", "a") as f:
+                # Save the entry in plain text, mainly for debugging
+                text = (
+                    "    ".join(("\n" + entry["text"].lstrip()).splitlines(True)) + "\n"
+                )
+                f.write(f"[ENTRY {i}] {text}")
+
+        # Creating new json for each individual newsletter rather than individual summary
+        alignment_newsletter = {}
+        for i, entry in enumerate(alignment_newsletter_entry_list):
+            i = str(i)
+            newsletter_number = alignment_newsletter_entry_list[i]["newsletter_number"]
+            if newsletter_number not in alignment_newsletter:
+                alignment_newsletter[newsletter_number] = entry
+                alignment_newsletter[newsletter_number]["individual_summary"].pop()
+
+        alignment_newsletter_entry_list = []
+        for entry in alignment_newsletter_entries.keys():
+            alignment_newsletter_entry_list.append(alignment_newsletter_entries[entry])
+
+        for i, entry in enumerate(alignment_newsletter_entry_list):
+            i = str(i)
             with jsonlines.open("data/alignment_newsletter.jsonl", "a") as writer:
                 writer.write(entry)
             with open("data/alignment_newsletter.txt", "a") as f:
@@ -146,7 +172,7 @@ class AlignmentNewsletter:
             "categories": str(paper.categories) if abs != "" else "",
             "individual_summary": str(summary),
             "paper_text": str(markdown_text),
-            "full_newsletter_text": newsletter_text,
+            "text": newsletter_text,
             "bibliography_bbl": "",
             "bibliography_bib": "",
         }
@@ -165,7 +191,7 @@ class AlignmentNewsletter:
         )
         self.df["index"] = self.df.index
         wb = openpyxl.load_workbook(
-            "data/raw/alignment_newsletter/alignment_newsletter_with_summaries.xlsx"
+            "data/raw/alignment_newsletter/alignment_newsletter.xlsx"
         )
         self.ws = wb["Sheet1"]
 
