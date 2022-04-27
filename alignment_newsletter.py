@@ -25,7 +25,7 @@ class AlignmentNewsletter:
     def fetch_entries(self):
         print("Fetching alignment_newsletter entries")
         self.alignment_newsletter = {}
-        # self.df = self.df.iloc[0:10]
+        self.df = self.df.iloc[0:5]
         # with concurrent.futures.ProcessPoolExecutor(self.n_threads) as executor:
         #     executor.map(self.fetch_individual_entries, self.df.to_dict("records"))
         for index, row in self.df.iterrows():
@@ -58,11 +58,10 @@ class AlignmentNewsletter:
         # Creating new json for each individual newsletter rather than individual summary
         alignment_newsletter = {}
         for i, entry in enumerate(alignment_newsletter_entry_list):
-            i = str(i)
             newsletter_number = alignment_newsletter_entry_list[i]["newsletter_number"]
             if newsletter_number not in alignment_newsletter:
                 alignment_newsletter[newsletter_number] = entry
-                alignment_newsletter[newsletter_number]["individual_summary"].pop()
+                alignment_newsletter[newsletter_number].pop("individual_summary")
 
         alignment_newsletter_entry_list = []
         for entry in alignment_newsletter_entries.keys():
@@ -85,6 +84,7 @@ class AlignmentNewsletter:
             # index starts at 2 because the row 1 is the header
             paper_url = str(self.ws.cell(row=index + 2, column=3).hyperlink.target)
             newsletter_url = str(self.ws.cell(row=index + 2, column=8).hyperlink.target)
+            print(newsletter_url)
         except:
             paper_url = ""
             newsletter_url = ""
@@ -116,20 +116,22 @@ class AlignmentNewsletter:
             try:
                 r = requests.get(paper_url)
                 soup = bs(r.text)
-                markdown_text = extract_body_as_markdown_from_tei(soup.body)
+                markdown_text = extract_body_as_markdown_from_tei(soup)
             except:
                 pass
         # Extracting the markdown text from the newsletter
         try:
+            print("Fetching newsletter text")
             r = requests.get(newsletter_url)
             soup = bs(r.text)
-            newsletter_text = extract_body_as_markdown_from_tei(soup.body)
+            newsletter_text = extract_body_as_markdown_from_tei(soup)
             newsletter_text = (
                 "Highlights\n\n"
                 + newsletter_text.split("Highlights\n")[1].split(" |\n")[0]
             )
         except:
             pass
+        print(newsletter_text)
         summary = (
             "Title: "
             + str(row["Title"])
@@ -182,8 +184,10 @@ class AlignmentNewsletter:
         if os.path.exists("data/alignment_newsletter.jsonl"):
             print("Deleting old alignment_newsletter.jsonl")
             os.remove("data/alignment_newsletter.jsonl")
+            os.remove("data/alignment_newsletter_separate_summaries.jsonl")
         if os.path.exists("data/aligned_newsletter.txt"):
             os.remove("data/alignment_newsletter.txt")
+            os.remove("data/alignment_newsletter_separate_summaries.txt")
         # put the alignment_newsletter.xlsx file in the raw/alignment_newsletter folder
         # download new excel file here: https://docs.google.com/spreadsheets/d/1PwWbWZ6FPqAgZWOoOcXM8N_tUCuxpEyMbN1NYYC02aM/edit#gid=0
         self.df = pd.read_excel(
